@@ -10,3 +10,4 @@ generated/
 .DS_Store
 *.log
 tsconfig.tsbuildinfo
+context.md

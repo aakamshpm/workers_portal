@@ -1,5 +1,8 @@
+import "dotenv/config";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+// ADR-0004: chain tests run with a key present, never an empty key.
+if (!process.env.HMAC_SECRET) process.env.HMAC_SECRET = "test-key-for-hmac-swap";
 import {
   GENESIS_HASH,
   canonicalPayload,

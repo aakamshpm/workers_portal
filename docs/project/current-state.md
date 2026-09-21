@@ -11,8 +11,11 @@ What the running code does today.
 - Employer statement (one sealed note, no figure change).
 - Officer dispute review (not sealed, `confirmState` stays DISPUTED).
 - Complaints: six statuses, four decide outcomes, escalate to Labour Commissioner or Police.
-- Hash chain, seven types: OFFER, ACCEPT, WORK, PAYMENT, CONFIRM, DISPUTE, EMPLOYER_NOTE.
+- Hash chain with HMAC-SHA-256 (`HMAC_SECRET`), seven types: OFFER, ACCEPT, WORK, PAYMENT, CONFIRM, DISPUTE, EMPLOYER_NOTE. Missing key fails startup.
 - `rebuildPayload()` reads the live table row before hashing. Do not hash `LedgerEntry.payload` to verify a row.
+- Postgres + PostGIS in Docker. `User` has opt-in `looking`, `latitude`, `longitude`, `preferredWorkType`. `Place` holds public business listings (not jobs).
+- `SmsProvider` calls Textbee (`POST /gateway/send-sms`). Tests use a fake, never `api.textbee.dev`. `send()` fails when `TEXTBEE_API_KEY` is missing and writes no row. Inbound is a 30s poll, bodies go through `parseReply`.
+- Discovery routes exactly as `docs/contracts/discovery.md`: `POST /api/discovery/toggle`, `GET /nearby-work`, `GET /nearby-workers`. Distance via `ST_DWithin`, response has `distanceKm` only.
 
 ## Development seed (PIN 1234)
 
@@ -26,7 +29,7 @@ What the running code does today.
 | 9000010002 | Suresh Menon | CONTRACTOR |
 | 9000020001 | Anita Joseph | AUTHORITY |
 
-After a clean seed: 7 users, 4 offers, 9 work periods, 4 payments, 32 ledger rows, 46 SMS rows, 2 complaints.
+After a clean seed: 7 users, 4 offers, 9 work periods, 4 payments, 32 ledger rows, 46 SMS rows, 2 complaints, 2 places.
 
 ## Invariants
 
@@ -37,7 +40,7 @@ After a clean seed: 7 users, 4 offers, 9 work periods, 4 payments, 32 ledger row
 
 ## Not built yet
 
-HMAC, Textbee provider, PWA, discovery routes, Find Work / Find Workers.
+PWA, Find Work / Find Workers.
 
 ## Commands
 

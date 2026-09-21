@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 /**
  * ===========================================================================
@@ -247,9 +247,24 @@ export function canonicalPayload(p: SealedPayload): string {
  * a set of independent checksums. Each code depends on every record before it, so
  * one edit cannot be contained - it breaks the link at that point and every link
  * after it.
+ *
+ * ADR-0004: HMAC-SHA-256 with HMAC_SECRET, not plain SHA-256. Anyone who knows
+ * the field layout can compute a plain hash from the database alone, so the key
+ * lives on the server, never in the database. Tests set the same key through
+ * the environment. Missing key fails, never uses an empty key.
  */
+export function getHmacSecret(): string {
+  const s = process.env.HMAC_SECRET;
+  if (!s) {
+    throw new Error("HMAC_SECRET is not set. Set it in server/.env");
+  }
+  return s;
+}
+
 export function computeHash(previousHash: string, payload: string): string {
-  return createHash("sha256").update(`${previousHash}|${payload}`, "utf8").digest("hex");
+  return createHmac("sha256", getHmacSecret())
+    .update(`${previousHash}|${payload}`, "utf8")
+    .digest("hex");
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,10 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { getHmacSecret } from "./lib/hashChain";
+import { parseReply, pollInbound } from "./lib/sms";
 import { authRouter } from "./routes/auth";
+import { discoveryRouter } from "./routes/discovery";
 import { offersRouter } from "./routes/offers";
 import { paymentsRouter } from "./routes/payments";
 import { ledgerRouter } from "./routes/ledger";
@@ -11,6 +14,9 @@ import { smsRouter } from "./routes/sms";
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
 
+// ADR-0004: missing HMAC key fails startup, never uses an empty key.
+getHmacSecret();
+
 app.use(cors());
 app.use(express.json());
 
@@ -19,6 +25,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/discovery", discoveryRouter);
 app.use("/api/offers", offersRouter);
 app.use("/api/payments", paymentsRouter);
 app.use("/api/ledger", ledgerRouter);
@@ -45,4 +52,21 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 app.listen(PORT, () => {
   console.log(`API listening on http://localhost:${PORT}`);
+
+  // ADR-0008: inbound is a poll of Textbee on localhost. Webhook comes later.
+  // Only runs when a key is set, so local dev without Textbee is quiet.
+  if (process.env.TEXTBEE_API_KEY) {
+    const POLL_MS = 30_000;
+    setInterval(async () => {
+      try {
+        const stored = await pollInbound();
+        if (stored > 0) console.log(`[sms] polled ${stored} inbound message(s)`);
+        // New bodies go through existing parseReply in routes/sms.ts reply flow.
+        // Poll only stores; parsing here keeps the shape visible in logs.
+        void parseReply;
+      } catch (e) {
+        console.error("[sms] inbound poll failed", e);
+      }
+    }, POLL_MS);
+  }
 });

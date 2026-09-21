@@ -5,7 +5,7 @@ Status only. The ordered build is [`plan.md`](plan.md).
 | Milestone | Intent | Status |
 |---|---|---|
 | Structure | Docs, ADRs, OpenCode agents and skills | Done |
-| Platform | Postgres + PostGIS, HMAC, Textbee provider, poll inbound SMS | Not started |
+| Platform | Postgres + PostGIS, HMAC, Textbee provider, poll inbound SMS | Code done, waiting for one real SMS |
 | Worker | PWA on worker routes, Find Work, SMS as second client | Not started |
 | Contractor | PWA on contractor routes, website, Find Workers | Not started |
 | Labour office | Website only. No install prompt, no hiring map | Not started |

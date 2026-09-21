@@ -1,6 +1,6 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
 import { GENESIS_HASH, canonicalPayload, computeHash, type SealedPayload } from "../src/lib/hashChain";
 import {
@@ -14,7 +14,7 @@ import {
   type Language,
 } from "../src/lib/sms";
 
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! });
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 /** Every demo account uses this PIN. */
@@ -93,6 +93,7 @@ async function main() {
   await prisma.payment.deleteMany();
   await prisma.workPeriod.deleteMany();
   await prisma.workOffer.deleteMany();
+  await prisma.place.deleteMany();
   await prisma.user.deleteMany();
 
   previousHash = GENESIS_HASH;
@@ -101,6 +102,8 @@ async function main() {
   const pin = await bcrypt.hash(DEMO_PIN, 10);
 
   // --- people -------------------------------------------------------------
+  // Coordinates are typed locations around Ernakulam (opt-in directory,
+  // ADR-0006). They are not live GPS.
   const ramesh = await prisma.user.create({
     data: {
       name: "Ramesh Pillai",
@@ -110,6 +113,10 @@ async function main() {
       company: "Ramesh Builders",
       homeState: "Kerala",
       language: "ml",
+      looking: true,
+      latitude: 9.9816,
+      longitude: 76.2999,
+      preferredWorkType: "Painting",
     },
   });
 
@@ -122,6 +129,10 @@ async function main() {
       company: "Sunrise Plywood Works",
       homeState: "Kerala",
       language: "ml",
+      looking: false,
+      latitude: 10.0261,
+      longitude: 76.3125,
+      preferredWorkType: "Plywood",
     },
   });
 
@@ -138,19 +149,85 @@ async function main() {
   });
 
   const bijoy = await prisma.user.create({
-    data: { name: "Bijoy Das", phone: "9880030001", role: "WORKER", pin, homeState: "West Bengal", language: "bn" },
+    data: {
+      name: "Bijoy Das",
+      phone: "9880030001",
+      role: "WORKER",
+      pin,
+      homeState: "West Bengal",
+      language: "bn",
+      looking: true,
+      latitude: 9.975,
+      longitude: 76.29,
+      preferredWorkType: "Painting",
+    },
   });
 
   const sanjay = await prisma.user.create({
-    data: { name: "Sanjay Kumar", phone: "9880030002", role: "WORKER", pin, homeState: "Bihar", language: "hi" },
+    data: {
+      name: "Sanjay Kumar",
+      phone: "9880030002",
+      role: "WORKER",
+      pin,
+      homeState: "Bihar",
+      language: "hi",
+      looking: true,
+      latitude: 9.99,
+      longitude: 76.31,
+      preferredWorkType: "Construction - shuttering",
+    },
   });
 
   const pramod = await prisma.user.create({
-    data: { name: "Pramod Nayak", phone: "9880030003", role: "WORKER", pin, homeState: "Odisha", language: "or" },
+    data: {
+      name: "Pramod Nayak",
+      phone: "9880030003",
+      role: "WORKER",
+      pin,
+      homeState: "Odisha",
+      language: "or",
+      looking: false,
+      latitude: 10.015,
+      longitude: 76.34,
+      preferredWorkType: "Plywood unit - press operation",
+    },
   });
 
   const rekha = await prisma.user.create({
-    data: { name: "Rekha Munda", phone: "9880030004", role: "WORKER", pin, homeState: "Jharkhand", language: "hi" },
+    data: {
+      name: "Rekha Munda",
+      phone: "9880030004",
+      role: "WORKER",
+      pin,
+      homeState: "Jharkhand",
+      language: "hi",
+      looking: true,
+      latitude: 9.97,
+      longitude: 76.28,
+      preferredWorkType: "Plywood unit - grading and stacking",
+    },
+  });
+
+  // --- public listings (businesses, not jobs) -------------------------------
+  await prisma.place.createMany({
+    data: [
+      {
+        name: "Example Interlock Works",
+        category: "interlock",
+        phone: "0484234567",
+        latitude: 9.99,
+        longitude: 76.31,
+        source: "public_listing",
+      },
+      {
+        name: "Kochi Timber Depot",
+        category: "plywood",
+        phone: "0484234987",
+        latitude: 10.015,
+        longitude: 76.34,
+        source: "public_listing",
+      },
+    ],
   });
 
   /**
