@@ -1,0 +1,14 @@
+# ADR index
+
+One short file per decision. Next number after the last file. Skill: `write-adr`.
+
+| ADR | Title |
+|---|---|
+| [0001](0001-typescript-react.md) | TypeScript, Express, React, Vite |
+| [0002](0002-postgresql-postgis.md) | PostgreSQL + PostGIS |
+| [0003](0003-hash-chain-not-blockchain.md) | Hash chain, not a blockchain |
+| [0004](0004-hmac.md) | HMAC instead of plain SHA-256 |
+| [0005](0005-pwa-not-native.md) | PWA, not a native app |
+| [0006](0006-opt-in-directory.md) | Opt-in directory, typed location |
+| [0007](0007-no-edit-no-delete.md) | No edit, no delete |
+| [0008](0008-textbee-sms.md) | Textbee hosted SMS |

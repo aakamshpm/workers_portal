@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "core",
+  "instructions": [
+    "docs/project/principles.md",
+    "docs/process/development-workflow.md",
+    "docs/process/teammate-boundaries.md",
+    "docs/project/current-state.md"
+  ]
+}

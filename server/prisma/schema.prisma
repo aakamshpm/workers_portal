@@ -1,0 +1,548 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ===========================================================================
+// Migrant Worker Wage & Grievance Ledger
+//
+// The flow this models:
+//
+//   1. Contractor and worker agree terms somehow (phone call, in person).
+//   2. Contractor sends a formal OFFER through the system.
+//   3. Worker gets it on the website and as an SMS, and replies YES or NO.
+//   4. On acceptance the terms are LOCKED and cannot be edited by anyone.
+//   5. Contractor logs work done and payments made against those locked terms.
+//   6. If something is wrong, the worker files a complaint.
+//   7. The authority asks the contractor first, then decides or escalates.
+//
+// The point of step 3 and 4: the worker's acceptance is itself a record. A
+// contractor cannot later claim a lower rate was agreed, because the worker's
+// own YES is stored against the exact figures they said yes to.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Identified by PHONE NUMBER, not email.
+//
+// A migrant worker has a phone number. Many do not have an email address, and
+// asking for one would exclude the people the system is for. The phone number
+// is also the address the SMS goes to, so using it as the login means the thing
+// they log in with and the thing they receive messages on are the same.
+//
+// A 4-digit PIN is used instead of a password, because it can be entered on a
+// basic keypad and read out over a helpline call.
+// ---------------------------------------------------------------------------
+model User {
+  id    String  @id @default(cuid())
+  phone String  @unique
+  name  String
+  role  String // WORKER | CONTRACTOR | AUTHORITY
+  pin   String // bcrypt hash of a 4-digit PIN
+
+  // Where the worker is from, and the language they read. Drives which language
+  // the SMS is composed in.
+  homeState String?
+  language  String  @default("en") // en | hi | bn | ml | or
+
+  // Contractors only: the firm they represent, shown to workers on an offer.
+  company String?
+
+  // True when the worker signed themselves up rather than being pre-registered.
+  selfRegistered Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  offersReceived WorkOffer[] @relation("WorkerOffers")
+  offersSent     WorkOffer[] @relation("ContractorOffers")
+
+  complaintsRaised   Complaint[] @relation("ComplaintRaiser")
+  complaintActions   ComplaintAction[] @relation("ActionAuthor")
+  employerStatements EmployerStatement[] @relation("EmployerStatementAuthor")
+  disputeReviews     DisputeReview[] @relation("DisputeReviewer")
+
+  messages SmsMessage[]
+}
+
+// ---------------------------------------------------------------------------
+// The offer, and once accepted, the contract.
+//
+// One table holds both states rather than copying an accepted offer into a
+// separate "agreement" table. Copying would mean the same terms exist twice and
+// could drift apart; keeping one row means there is exactly one authoritative
+// set of figures, and `status` says whether it is binding yet.
+//
+// status: PENDING   - sent, worker has not replied
+//         ACCEPTED  - worker said YES. Terms are locked from this point.
+//         DECLINED  - worker said NO. No work can be logged.
+//         CANCELLED - contractor withdrew it before the worker replied.
+// ---------------------------------------------------------------------------
+model WorkOffer {
+  id           String @id @default(cuid())
+  workerId     String
+  contractorId String
+
+  // The agreed terms. After acceptance these are never updated - the API
+  // refuses, and any direct database change breaks the record chain.
+  dailyRate Float
+  workType  String // "Construction - steel binding"
+  siteName  String // "Kakkanad Phase 2"
+  startDate DateTime
+  // What the contractor expects the job to run for. Not a hard limit.
+  expectedDays Int
+  // Free text for anything else agreed: overtime rate, food, accommodation.
+  extraTerms String?
+
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  // Set when the worker replies.
+  respondedAt DateTime?
+  // How the worker replied, so the demo can show both routes working.
+  respondedVia String? // SMS | WEB
+  declineReason String?
+
+  worker     User @relation("WorkerOffers", fields: [workerId], references: [id])
+  contractor User @relation("ContractorOffers", fields: [contractorId], references: [id])
+
+  workPeriods WorkPeriod[]
+  payments    Payment[]
+  complaints  Complaint[]
+  employerStatements EmployerStatement[]
+  disputeReviews     DisputeReview[]
+
+  @@index([workerId])
+  @@index([contractorId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Work done, recorded a stretch at a time rather than one row per day.
+//
+// A contractor pays weekly and thinks in weeks: "Bijoy worked 6 days last
+// week". Forcing one row per day would mean 24 clicks for a month and 24 rows
+// scrolling past in a demo, without protecting anything extra - the number that
+// matters is the day count, and it is sealed either way.
+//
+// `days` allows halves (5.5) for rain closures and early departures.
+// ---------------------------------------------------------------------------
+model WorkPeriod {
+  id      String @id @default(cuid())
+  offerId String
+
+  fromDate DateTime
+  toDate   DateTime
+  days     Float
+  note     String?
+
+  createdAt DateTime @default(now())
+
+  // ----------------------------------------------------------------------
+  // Worker confirmation.
+  //
+  // This is the field that makes the work log worth anything. Without it the
+  // day count is written by the contractor alone, so a contractor who records
+  // 3 days for a 6-day week produces a perfectly valid, permanently sealed
+  // lie. The chain would protect the falsehood instead of the worker.
+  //
+  // So every logged period is sent to the worker, who replies OK or WRONG.
+  //
+  //   WAITING   - recorded by the contractor, worker has not replied yet.
+  //               Counted separately in the balance and labelled as such.
+  //   CONFIRMED - the worker agrees this is what they worked. Now it is
+  //               evidence, because both sides wrote it.
+  //   DISPUTED  - the worker says it is wrong. Goes straight to the labour
+  //               officer's queue with the worker's own figure attached.
+  // ----------------------------------------------------------------------
+  confirmState String    @default("WAITING")
+  confirmedAt  DateTime?
+  confirmedVia String? // SMS | WEB
+  // What the worker says the real number is, when they dispute it.
+  workerClaimsDays Float?
+  disputeNote      String?
+
+  offer WorkOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([offerId])
+  @@index([confirmState])
+}
+
+// ---------------------------------------------------------------------------
+// Money actually handed over. Separate from what was earned, because the gap
+// between the two is the wage claim.
+// ---------------------------------------------------------------------------
+model Payment {
+  id      String @id @default(cuid())
+  offerId String
+
+  amount Float
+  paidOn DateTime
+  method String  @default("CASH") // CASH | UPI | BANK
+  note   String?
+
+  createdAt DateTime @default(now())
+
+  // ----------------------------------------------------------------------
+  // Worker confirmation, for the same reason as WorkPeriod above, and with an
+  // extra one: a cash payment has no bank trail. "I paid him Rs 8000" is
+  // otherwise just a claim. The worker replying OK is the receipt.
+  //
+  // A disputed payment is the serious case - the contractor says money was
+  // handed over and the worker says it was not - so it goes to the officer
+  // with both figures recorded.
+  // ----------------------------------------------------------------------
+
+  // ----------------------------------------------------------------------
+  // Proof of handover.
+  //
+  // How strongly this payment can be shown to have happened. This is a
+  // property of the payment, not of who is telling the truth, and the three
+  // levels are honestly different:
+  //
+  //   NONE      - the contractor wrote it down and nothing else exists. If the
+  //               worker denies it, nobody can settle the argument. The system
+  //               says so rather than pretending otherwise.
+  //   CODE      - a one-time code was sent to the WORKER's phone and read back
+  //               by the contractor at the moment of handover. Proves the
+  //               worker's phone was present, at that minute, for that amount.
+  //   REFERENCE - a UPI or bank reference number. Strongest, because the trail
+  //               exists outside this system entirely and can be checked with
+  //               the bank.
+  //
+  // Deliberately NOT called "verified". A code proves presence and agreement
+  // at a moment; it cannot prove banknotes moved. Naming it "proof level"
+  // keeps that distinction visible in the code as well as the interface.
+  // ----------------------------------------------------------------------
+  proofType String @default("NONE") // NONE | CODE | REFERENCE
+
+  /** For REFERENCE: the UPI transaction id or bank reference the payer holds. */
+  proofReference String?
+
+  /** For CODE: when the worker's code was accepted. */
+  proofAt DateTime?
+  confirmState String    @default("WAITING")
+  confirmedAt  DateTime?
+  confirmedVia String? // SMS | WEB
+  // What the worker says they actually received.
+  workerClaimsAmount Float?
+  disputeNote        String?
+
+  offer WorkOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([offerId])
+  @@index([confirmState])
+}
+
+// ---------------------------------------------------------------------------
+// The record chain.
+//
+// Six kinds of event are sealed into ONE ordered chain, because the order they
+// happened in is itself evidence: offer, the worker's acceptance, the work, the
+// payments, and the worker's confirmation or rejection of each entry.
+//
+// The ACCEPT entry is the most important one in the whole system. It is the
+// worker's own YES, sealed against the exact figures they agreed to.
+//
+//   recordType: OFFER | ACCEPT | WORK | PAYMENT | CONFIRM | DISPUTE
+//   recordId:   the row in the matching table
+//
+// CONFIRM and DISPUTE are the worker's response to a WORK or PAYMENT record.
+// They are sealed as their own entries rather than as a flag on the original,
+// because the worker's answer is a separate statement made at a separate time -
+// and because the original record must stay exactly as the contractor wrote it.
+//   payload:    the sealed fields as one canonical string
+// ---------------------------------------------------------------------------
+model LedgerEntry {
+  id         String @id @default(cuid())
+  chainIndex Int    @unique
+
+  recordType String
+  recordId   String
+
+  // The exact text that was hashed, kept as evidence of the original values so
+  // a failure report can say "rate was 850, database now says 600".
+  payload String
+
+  // For display and filtering. Not part of the hash.
+  workerId String
+  summary  String
+
+  createdAt DateTime @default(now())
+
+  previousHash String
+  currentHash  String
+
+  @@index([workerId])
+  @@index([recordType])
+}
+
+// ---------------------------------------------------------------------------
+// Simulated SMS.
+//
+// Every message the system would send is stored here instead of being handed to
+// a telecom gateway. The worker's "My SMS" page reads this table, which is what
+// makes the demo honest: the messages are really generated by the same code that
+// would send them, and the page is clearly labelled as a simulation.
+//
+// direction: OUT - system to worker
+//            IN  - worker's reply, e.g. "YES 4821"
+// ---------------------------------------------------------------------------
+model SmsMessage {
+  id     String @id @default(cuid())
+  userId String
+
+  direction String
+  body      String
+  language  String @default("en")
+
+  /**
+   * The same message rendered in English, kept only so a reader who does not know
+   * the worker's language can check what he was actually told. Null when `body`
+   * is already English, and for a worker's own inbound reply, which is typed in
+   * Latin keywords anyway.
+   *
+   * This is the same message builder called a second time with "en", not machine
+   * translation, so the two versions cannot drift apart.
+   */
+  bodyEn String?
+
+  // Short code quoted in the message so a reply can be matched to an offer, and
+  // a helpline operator can find the right record over the phone.
+  reference String?
+
+  // What the message was about, for grouping on the page.
+  kind String // OFFER | ACCEPTED | DECLINED | PAYMENT | BALANCE | COMPLAINT | AUTHORITY
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// A complaint against a specific work contract.
+//
+// Deliberately OUTSIDE the record chain: a complaint raised later must not alter
+// the record it complains about. The record stays frozen and the objection sits
+// beside it.
+//
+// status: OPEN              - filed, nobody has acted
+//         AWAITING_EMPLOYER - authority has asked the contractor to respond
+//         RESOLVED          - worker's claim upheld
+//         REJECTED          - claim not upheld
+//         ESCALATED         - sent to Labour Commissioner or police
+// ---------------------------------------------------------------------------
+model Complaint {
+  id      String @id @default(cuid())
+  offerId String
+  raisedById String
+
+  category      String // UNPAID | UNDERPAID | RATE_DISPUTE | DAYS_DISPUTE | CONDITIONS | OTHER
+  description   String
+  // The language the worker wrote in, so the authority knows if translation is
+  // needed before acting.
+  language      String @default("en")
+  claimedAmount Float?
+
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+
+  // Filled when the case is closed.
+  outcome     String?
+  outcomeNote String?
+  closedAt    DateTime?
+
+  offer    WorkOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  raisedBy User      @relation("ComplaintRaiser", fields: [raisedById], references: [id])
+
+  actions ComplaintAction[]
+
+  @@index([status])
+  @@index([offerId])
+}
+
+// ---------------------------------------------------------------------------
+// Every step taken on a complaint, in order.
+//
+// A separate table rather than columns on Complaint, because the whole point is
+// that the handling is auditable: who asked the contractor, what the contractor
+// said, who decided, and why. A single "resolution note" column would lose that
+// history.
+//
+// kind: ASKED_EMPLOYER    - authority requested an explanation
+//       EMPLOYER_REPLY    - contractor's response
+//       CALLED_WORKER     - authority phoned the worker
+//       CALLED_EMPLOYER   - authority phoned the contractor
+//       MESSAGED_WORKER   - authority sent a message through the portal/SMS
+//       DECIDED           - upheld or rejected
+//       ESCALATED         - referred to Labour Commissioner or police
+// ---------------------------------------------------------------------------
+model ComplaintAction {
+  id          String @id @default(cuid())
+  complaintId String
+  authorId    String
+
+  kind String
+  note String
+
+  // For ESCALATED: where it went.
+  escalatedTo String? // LABOUR_COMMISSIONER | POLICE
+
+  createdAt DateTime @default(now())
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  author    User      @relation("ActionAuthor", fields: [authorId], references: [id])
+
+  @@index([complaintId])
+}
+
+// ---------------------------------------------------------------------------
+// One-time handover codes.
+//
+// The mechanism, and why it constitutes evidence:
+//
+//   1. The contractor is about to hand over cash. He asks the system for a
+//      code, naming the worker and the amount.
+//   2. The code is delivered ONLY to the worker's phone number. It never
+//      appears on the contractor's screen.
+//   3. The worker reads it off their own phone and gives it to the contractor,
+//      once the money is in their hand.
+//   4. The contractor types it in. The payment is recorded with proofType CODE.
+//
+// Because the code reaches only the worker's phone, the contractor cannot
+// obtain it alone. A completed code therefore shows that at that minute, for
+// that amount, the worker's phone was present and its holder cooperated.
+//
+// What it does not show: that banknotes physically moved, or that the worker
+// was not pressured. It is stronger than one person's word and weaker than a
+// bank transfer, and the interface says exactly that.
+//
+// IMPORTANT: this is NOT the worker's login PIN. Using the login PIN would hand
+// the worker's credentials to the contractor, who could then sign in as the
+// worker and confirm his own records. A single-use code tied to one amount
+// gives the proof without giving away the account.
+// ---------------------------------------------------------------------------
+model HandoverCode {
+  id String @id @default(cuid())
+
+  offerId      String
+  workerId     String
+  contractorId String
+
+  /** The amount this code is good for. A code cannot be reused for a different sum. */
+  amount Float
+  code   String
+
+  /** Short window, because it is meant to be used during the handover itself. */
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  /** Set once the payment row exists, so the code and the payment are linked. */
+  paymentId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([workerId])
+  @@index([contractorId])
+  @@index([code])
+}
+
+// ---------------------------------------------------------------------------
+// The contractor's answer to a record his worker rejected.
+//
+// Why this exists: the work log is written by the contractor, so the worker's
+// OK/WRONG answer is the safeguard against an understated week. That safeguard
+// only works if the contractor cannot overrule it, which is why nothing here
+// changes the WorkPeriod or the Payment and nothing clears `confirmState`.
+//
+// But "cannot overrule" and "cannot answer" are different things. Before this
+// existed, a contractor whose figures were right could only watch, and the
+// officer later opened the case with the worker's account and silence from the
+// employer. Silence reads as an admission, which is not fair either.
+//
+// So the contractor may attach a statement, and only that. Whether the
+// disagreement becomes a formal case is still the officer's decision, and only
+// the officer or the worker can end a dispute.
+// ---------------------------------------------------------------------------
+model EmployerStatement {
+  id String @id @default(cuid())
+
+  /** WORK or PAYMENT: which table the disputed record lives in. */
+  targetType String
+  targetId   String
+
+  offerId      String
+  contractorId String
+
+  /** The contractor's explanation, in his own words. Never edited. */
+  note String
+
+  createdAt DateTime @default(now())
+
+  offer      WorkOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  contractor User      @relation("EmployerStatementAuthor", fields: [contractorId], references: [id])
+
+  // One statement per disputed record, so the file cannot be flooded with
+  // repeated answers to the same rejection.
+  @@unique([targetType, targetId])
+  @@index([offerId])
+}
+
+// ---------------------------------------------------------------------------
+// A labour officer marking a disagreement as no longer needing her attention.
+//
+// The problem this solves: the disputed-records queue was built from
+// `confirmState == "DISPUTED"`, which is a permanent fact about a record. A
+// dispute settled by a phone call, or ruled on months ago, stayed in the queue
+// looking exactly as urgent as a new one. The failure that follows is an officer
+// contacting a contractor about a matter already closed, which teaches employers
+// to ignore the system.
+//
+// What this row is NOT: it does not touch the WorkPeriod or the Payment, and it
+// does not change `confirmState`. The record stays DISPUTED for ever, because the
+// two figures the parties gave are sealed and the disagreement genuinely happened.
+// This only records that an officer looked, and why she is not acting further.
+//
+// Deliberately not part of the hash chain. The chain seals what the worker and
+// the contractor stated, so that neither can revise it. An officer's case-handling
+// note is administration on top of that evidence, not evidence itself, and sealing
+// it would imply the officer's opinion carries the same weight as the parties'
+// sworn figures. Complaints are outside the chain for the same reason.
+// ---------------------------------------------------------------------------
+model DisputeReview {
+  id String @id @default(cuid())
+
+  /** WORK or PAYMENT: which table the disputed record lives in. */
+  targetType String
+  targetId   String
+
+  offerId   String
+  officerId String
+
+  /**
+   * Why it no longer needs attention.
+   *
+   * SETTLED_OUTSIDE - the two sides sorted it out themselves, or by phone
+   * DECIDED         - a formal complaint on this contract was already ruled on
+   * NO_ACTION       - looked at, too small or too old to pursue
+   * UNPROVABLE      - unwitnessed cash, nothing can establish who is right
+   */
+  reason String
+
+  /** The officer's own words. This is what a later officer actually reads. */
+  note String
+
+  createdAt DateTime @default(now())
+
+  offer   WorkOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  officer User      @relation("DisputeReviewer", fields: [officerId], references: [id])
+
+  // One review per disputed record. Reopening is a separate action, not a second
+  // review, so the file never holds two conflicting closures.
+  @@unique([targetType, targetId])
+  @@index([offerId])
+}

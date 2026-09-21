@@ -1,0 +1,17 @@
+# Postgres + PostGIS. API and web run on the host (tsx / Vite).
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: wage
+      POSTGRES_PASSWORD: wage
+      POSTGRES_DB: wage
+    volumes:
+      - wage_pg:/var/lib/postgresql/data
+
+volumes:
+  wage_pg:

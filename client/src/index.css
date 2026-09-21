@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Tabular figures keep money columns and hash strings aligned down the table,
+   which matters when an evaluator is comparing hashes by eye. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
