@@ -13,11 +13,12 @@ import {
   shortRef,
   type Language,
 } from "../src/lib/sms";
+import { seedAllowed } from "./seed-guard";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-/** Every demo account uses this PIN. */
+/** Every development account uses this PIN. Never used outside the seed. */
 const DEMO_PIN = "1234";
 
 /**
@@ -77,6 +78,12 @@ const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const englishCopy = (english: string, language: string) => (language === "en" ? null : english);
 
 async function main() {
+  // ADR-0014: this deletes every user, so it must never reach a real database.
+  const guard = seedAllowed(process.env.DATABASE_URL, process.env.NODE_ENV);
+  if (!guard.ok) {
+    throw new Error(`Seed refused. ${guard.reason}`);
+  }
+
   // Clear in dependency order so re-running is safe.
   await prisma.complaintAction.deleteMany();
   await prisma.complaint.deleteMany();

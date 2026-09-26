@@ -14,6 +14,14 @@ npm run dev
 
 API: `http://localhost:4000`. Web: `http://localhost:5173`.
 
+The seed makes worker and contractor accounts with PIN `1234` (`docs/project/current-state.md`), but no officer account, because an officer account is never seeded with a PIN (ADR-0014). Make the first one:
+
+```bash
+npm --prefix server run create-officer -- --name "Your Name" --phone 9000020001
+```
+
+Then open `http://localhost:5173/`, tap "Forgot PIN?", and set a PIN for that number. The code goes to the phone the SMS provider is wired to; with no `TEXTBEE_API_KEY` set, it is only in the server log.
+
 ## Textbee (human, not an agent)
 
 1. Account at [textbee.dev](https://textbee.dev)

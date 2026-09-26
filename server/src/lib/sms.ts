@@ -242,6 +242,25 @@ export async function send(input: {
 }
 
 
+/**
+ * Send a one-time phone code (ADR-0014), and store nothing.
+ *
+ * Different from `send()` on purpose:
+ *   - it takes a phone number, because a registration code is sent before the
+ *     user exists, and `SmsMessage` needs a user;
+ *   - it writes no row, because the row would hold the plain code, which the
+ *     hash in PhoneCode exists to keep out of the database.
+ *
+ * Like `send()`, it fails when there is no Textbee key and no fake provider.
+ */
+export async function sendCodeSms(phone: string, body: string): Promise<void> {
+  if (customProvider === null && !getTextbeeApiKey()) {
+    throw new Error("TEXTBEE_API_KEY is not set. Set it in server/.env");
+  }
+  const to = phone.startsWith("+") ? phone : `+91${phone}`;
+  await getSmsProvider().send({ to, body });
+}
+
 // ---------------------------------------------------------------------------
 // Message text
 //
@@ -760,6 +779,29 @@ export function handoverDoneMessage(
       return `Rs ${amt} panam, ${input.contractorName}-il ninnu, code upayogichu rekhappeduthi. Ithu ningalude receipt aanu. Ref ${input.ref}`;
     default:
       return `Rs ${amt} cash from ${input.contractorName}, recorded with your code. This is your receipt. Ref ${input.ref}`;
+  }
+}
+
+/**
+ * The SMS that carries a one-time phone code (ADR-0014).
+ *
+ * The same warning in every language: never tell this code to anyone. A
+ * contractor who learns a worker's reset code could take over his account.
+ * Latin script for every language, like every other message in this file,
+ * because it must display on any handset.
+ */
+export function phoneCodeMessage(code: string, language: Language): string {
+  switch (language) {
+    case "hi":
+      return `Aapka code: ${code}. Yeh code kisi ko na batayein. 10 minute tak chalega.`;
+    case "bn":
+      return `Apnar code: ${code}. Ei code karo ke deben na. 10 minute cholbe.`;
+    case "or":
+      return `Apananka code: ${code}. Ehi code kahaku dianttu nahin. 10 minute chalibe.`;
+    case "ml":
+      return `Ningalude code: ${code}. Ee code aarkum kodukkaruthu. 10 minute nilkum.`;
+    default:
+      return `Your code: ${code}. Do not tell this code to anyone. It works for 10 minutes.`;
   }
 }
 

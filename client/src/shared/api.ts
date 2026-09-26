@@ -1,4 +1,5 @@
 import type {
+  Account,
   AuthUser,
   AwaitingItem,
   Complaint,
@@ -92,8 +93,56 @@ export const api = {
       body: JSON.stringify({ phone, pin }),
     }),
 
-  register: (input: { name: string; phone: string; pin: string; homeState?: string }) =>
+  // --- phone codes, registration, forgot PIN (docs/contracts/auth.md) -----
+
+  /**
+   * Ask for a one-time code by SMS. The answer is the same whether or not the
+   * number has an account, so it never tells anyone who is registered.
+   */
+  sendPhoneCode: (input: { phone: string; purpose: "REGISTER" | "RESET_PIN"; language?: string }) =>
+    request<{ sent: boolean; expiresInMinutes: number }>("/api/auth/code", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  register: (input: {
+    phone: string;
+    code: string;
+    name: string;
+    homeState: string;
+    pin: string;
+    language?: string;
+  }) =>
     request<{ token: string; user: AuthUser }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  resetPin: (input: { phone: string; code: string; pin: string }) =>
+    request<{ token: string; user: AuthUser }>("/api/auth/reset-pin", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  /** Saves the signed-in user's language. The answer has a new token with it. ADR-0015. */
+  setLanguage: (language: string) =>
+    request<{ token: string; user: AuthUser }>("/api/auth/language", {
+      method: "PATCH",
+      body: JSON.stringify({ language }),
+    }),
+
+  // --- accounts made by the labour office (officer only) ------------------
+
+  accounts: () => request<{ accounts: Account[] }>("/api/accounts").then((r) => r.accounts),
+
+  /** Creates the account with no PIN. The owner sets it with "Forgot PIN". */
+  createAccount: (input: {
+    role: "CONTRACTOR" | "AUTHORITY";
+    name: string;
+    phone: string;
+    company?: string;
+  }) =>
+    request<Account>("/api/accounts", {
       method: "POST",
       body: JSON.stringify(input),
     }),

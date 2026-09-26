@@ -15,5 +15,6 @@ Locked. Change only with a new ADR.
 | Maps | Leaflet + OpenStreetMap tiles | — |
 | Page tests | Vitest + Testing Library + jsdom | 0009 |
 | Place search | Photon (OpenStreetMap), called by the server, district-town fallback | 0010, 0011 |
+| Worker languages | Own typed dictionaries, no i18n library | 0015 |
 
 Local run: API and Vite on the host. Postgres runs in Docker.

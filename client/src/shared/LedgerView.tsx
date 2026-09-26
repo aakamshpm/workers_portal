@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { LedgerResponse, RecordType, VerificationResult } from "./types";
 import VerifyPanel from "./components/VerifyPanel";
+import { useT } from "./i18n";
+import type { MessageKey } from "./i18n/en";
 import {
   Card,
   EmptyState,
@@ -10,14 +12,15 @@ import {
   formatDate,
 } from "./components/ui";
 
-const FILTERS: { id: RecordType; label: string }[] = [
-  { id: "OFFER", label: "Work offered" },
-  { id: "ACCEPT", label: "Said yes" },
-  { id: "WORK", label: "Work done" },
-  { id: "PAYMENT", label: "Money paid" },
-  { id: "CONFIRM", label: "Agreed" },
-  { id: "DISPUTE", label: "Said wrong" },
-  { id: "EMPLOYER_NOTE", label: "Employer answered" },
+// English in the contractor and officer apps, the worker's language in his (ADR-0015).
+const FILTERS: { id: RecordType; label: MessageKey }[] = [
+  { id: "OFFER", label: "recOffer" },
+  { id: "ACCEPT", label: "recAccept" },
+  { id: "WORK", label: "recWork" },
+  { id: "PAYMENT", label: "recPayment" },
+  { id: "CONFIRM", label: "recConfirm" },
+  { id: "DISPUTE", label: "recDispute" },
+  { id: "EMPLOYER_NOTE", label: "recEmployerNote" },
 ];
 
 /**
@@ -32,6 +35,7 @@ const FILTERS: { id: RecordType; label: string }[] = [
  * "Check all records".
  */
 export default function LedgerView() {
+  const { t } = useT();
   const [data, setData] = useState<LedgerResponse | null>(null);
   const [error, setError] = useState("");
   const [verification, setVerification] = useState<VerificationResult | null>(null);
@@ -41,7 +45,7 @@ export default function LedgerView() {
     api
       .ledger()
       .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load the records. Please try again."));
+      .catch((err) => setError(err instanceof Error ? err.message : t("errorLoadRecords")));
   }, []);
 
   /** Records flagged by the most recent check. */
@@ -65,13 +69,13 @@ export default function LedgerView() {
       {error && <ErrorNote message={error} />}
 
       <Card
-        title="All records"
-        description="Every offer, day of work and payment on your contracts, oldest first."
+        title={t("recordsTitle")}
+        description={t("recordsDescription")}
         actions={
           <div className="flex flex-wrap rounded-md ring-1 ring-inset ring-slate-300">
-            {[{ id: "ALL" as const, label: `All ${all.length}` }, ...FILTERS.map((f) => ({
+            {[{ id: "ALL" as const, label: `${t("filterAll")} ${all.length}` }, ...FILTERS.map((f) => ({
               id: f.id,
-              label: `${f.label} ${count(f.id)}`,
+              label: `${t(f.label)} ${count(f.id)}`,
             }))].map((f) => (
               <button
                 key={f.id}
@@ -90,21 +94,21 @@ export default function LedgerView() {
         }
       >
         {!data ? (
-          <EmptyState>Loading…</EmptyState>
+          <EmptyState>{t("loading")}</EmptyState>
         ) : entries.length === 0 ? (
           <EmptyState>
             {filter === "ALL"
-              ? "Nothing written down yet."
-              : "Nothing of that kind yet."}
+              ? t("nothingYet")
+              : t("nothingOfKind")}
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
                 <tr>
-                  <th className="px-5 py-2.5 font-medium">What kind</th>
-                  <th className="px-3 py-2.5 font-medium">What was written down</th>
-                  <th className="px-5 py-2.5 font-medium">Day</th>
+                  <th className="px-5 py-2.5 font-medium">{t("colKind")}</th>
+                  <th className="px-3 py-2.5 font-medium">{t("colWhat")}</th>
+                  <th className="px-5 py-2.5 font-medium">{t("colDay")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

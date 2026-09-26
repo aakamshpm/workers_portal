@@ -386,3 +386,15 @@ export interface TrackRecord {
   };
   caution: string;
 }
+
+/** A contractor or officer account, as the labour officer sees it. docs/contracts/auth.md. */
+export interface Account {
+  id: string;
+  name: string;
+  phone: string;
+  role: "CONTRACTOR" | "AUTHORITY";
+  company: string | null;
+  /** False until the owner sets a PIN with "Forgot PIN". The PIN itself is never sent. */
+  hasPin: boolean;
+  createdAt: string;
+}

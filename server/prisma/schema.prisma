@@ -41,7 +41,9 @@ model User {
   phone String  @unique
   name  String
   role  String // WORKER | CONTRACTOR | AUTHORITY
-  pin   String // bcrypt hash of a 4-digit PIN
+  // bcrypt hash of a 4-digit PIN. Null for an account the labour office made
+  // that has not set a PIN yet (ADR-0014); such an account cannot sign in.
+  pin   String?
 
   // Where the worker is from, and the language they read. Drives which language
   // the SMS is composed in.
@@ -582,6 +584,32 @@ model DisputeReview {
 // towns. The rows are written by the migration, not by the seed, so every
 // database has them and a reseed never removes them.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// One-time phone codes (ADR-0014).
+//
+// Proves that the person registering, or resetting a PIN, holds the phone.
+// Only a bcrypt hash of the code is kept. A code expires after 10 minutes,
+// works once, and is spent after 5 wrong tries. A new request for the same
+// phone and purpose replaces the old code.
+//
+// Not linked to User: a REGISTER code is sent before the user exists.
+// Rows are also what the rate limit counts, so a used code is kept, not deleted.
+// ---------------------------------------------------------------------------
+model PhoneCode {
+  id       String @id @default(cuid())
+  phone    String
+  purpose  String // REGISTER | RESET_PIN
+  codeHash String
+
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, purpose])
+  @@index([phone, createdAt])
+}
+
 model Town {
   id        String @id
   name      String @unique

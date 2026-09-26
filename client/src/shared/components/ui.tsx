@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Evidence } from "../types";
+import { useT } from "../i18n";
 
 /** Money, as an Indian wage slip would show it. */
 export function formatMoney(amount: number): string {
@@ -133,7 +134,7 @@ export function Field({
 }
 
 export const inputClass =
-  "w-full rounded-md border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-slate-900";
+  "w-full rounded-md border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-slate-900 focus:outline-none";
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="px-5 py-10 text-center text-sm text-slate-500">{children}</p>;
@@ -168,11 +169,13 @@ export function InfoNote({ children }: { children: ReactNode }) {
 
 /** The state of an offer. */
 export function OfferBadge({ status }: { status: string }) {
+  // English outside the worker app, which is the only app with a language provider.
+  const { t } = useT();
   const map: Record<string, { label: string; cls: string }> = {
-    PENDING: { label: "Waiting for your answer", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
-    ACCEPTED: { label: "You said yes", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    DECLINED: { label: "You said no", cls: "bg-slate-100 text-slate-600 ring-slate-200" },
-    CANCELLED: { label: "Taken back", cls: "bg-slate-100 text-slate-600 ring-slate-200" },
+    PENDING: { label: t("offerPending"), cls: "bg-amber-50 text-amber-700 ring-amber-200" },
+    ACCEPTED: { label: t("offerAccepted"), cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    DECLINED: { label: t("offerDeclined"), cls: "bg-slate-100 text-slate-600 ring-slate-200" },
+    CANCELLED: { label: t("offerCancelled"), cls: "bg-slate-100 text-slate-600 ring-slate-200" },
   };
   const it = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600 ring-slate-200" };
   return (

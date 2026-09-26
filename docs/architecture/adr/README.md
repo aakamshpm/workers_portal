@@ -17,3 +17,5 @@ One short file per decision. Next number after the last file. Skill: `write-adr`
 | [0011](0011-one-time-device-location.md) | One-time device location, saved as the nearest town |
 | [0012](0012-three-apps-one-vite-project.md) | Three apps from one Vite project |
 | [0013](0013-access-rules-for-real-use.md) | Access rules for real use |
+| [0014](0014-phone-codes-pin-reset-accounts.md) | Phone codes, PIN reset and account creation |
+| [0015](0015-worker-languages.md) | Worker text in five languages, without a library |

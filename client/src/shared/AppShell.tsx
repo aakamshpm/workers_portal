@@ -4,6 +4,7 @@ import { clearSession, getStoredUser } from "./api";
 import { SIGN_IN, appFor } from "./apps";
 import { leaveTo } from "./leave";
 import type { AuthUser, Role } from "./types";
+import { LanguagePicker, useT } from "./i18n";
 
 const ROLE_LABEL: Record<Role, string> = {
   CONTRACTOR: "Contractor",
@@ -48,6 +49,10 @@ export function useAppSession(role: Role): AuthUser | null {
  * app's first tab, so a mistyped address stays inside the app.
  */
 export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
+  // English unless the app mounts an I18nProvider. Only the worker app does (ADR-0015).
+  const { t } = useT();
+  const roleLabel = user.role === "WORKER" ? t("roleWorker") : ROLE_LABEL[user.role];
+
   function signOut() {
     clearSession();
     leaveTo(SIGN_IN);
@@ -58,17 +63,16 @@ export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
           <div>
-            <h1 className="text-sm font-semibold tracking-tight text-slate-900">Worker Pay Record</h1>
-            <p className="text-xs text-slate-500">
-              The pay that was promised, the days worked, and the money paid
-            </p>
+            <h1 className="text-sm font-semibold tracking-tight text-slate-900">{t("appTitle")}</h1>
+            <p className="text-xs text-slate-500">{t("appTagline")}</p>
           </div>
 
           <div className="flex items-center gap-4">
+            <LanguagePicker />
             <div className="text-right">
               <p className="text-sm font-medium text-slate-900">{user.name}</p>
               <p className="text-xs text-slate-500">
-                {ROLE_LABEL[user.role]}
+                {roleLabel}
                 {user.homeState ? ` · ${user.homeState}` : ""}
                 {user.company ? ` · ${user.company}` : ""}
               </p>
@@ -78,12 +82,12 @@ export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]
               onClick={signOut}
               className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50"
             >
-              Sign out
+              {t("signOut")}
             </button>
           </div>
         </div>
 
-        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6" aria-label="Sections">
+        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6" aria-label={t("sections")}>
           {tabs.map((t) => (
             <NavLink
               key={t.path}
