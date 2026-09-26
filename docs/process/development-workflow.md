@@ -21,6 +21,29 @@ Agents write tests and implementation. Humans look at the running product at the
 
 Never call `api.textbee.dev` from a test. Never send a real SMS from CI.
 
+## Tests use their own database
+
+Every test file starts with `import "./setup";`, which points `DATABASE_URL` at
+`TEST_DATABASE_URL` (`wage_test`) before Prisma loads.
+
+This is not tidiness. Tests append ledger rows and then delete the offers those
+rows sealed. The ledger is append-only, so on the development database
+`verifyLedger()` reports `RECORD_MISSING` for ever and cannot be repaired
+without a reseed. Create the test database once:
+
+```bash
+docker exec compose-db-1 psql -U wage -d postgres -c "CREATE DATABASE wage_test OWNER wage;"
+DATABASE_URL="postgresql://wage:wage@localhost:5432/wage_test" npx --prefix server prisma migrate deploy
+```
+
+## Textbee free plan is a budget
+
+50 messages a day, 300 a month, and every recipient counts as one. An offer plus
+its receipt is two, and each work or payment row is two more, so one full demo
+run costs roughly a dozen. Send real messages only to check the gateway. Tests
+use the fake provider, and the inbound poll only runs when `TEXTBEE_API_KEY` is
+set, so leave the key out of `server/.env` while working on anything else.
+
 ## Done for a slice
 
 - Tests green

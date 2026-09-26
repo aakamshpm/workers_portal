@@ -23,6 +23,15 @@ export interface SmsSendResult {
 }
 
 export interface SmsInbound {
+  /**
+   * The provider's own message id.
+   *
+   * Dedupe uses this, not the body text. Two identical bodies are two real
+   * messages: a worker who replied "YES 5804" and saw nothing happen will send
+   * the same words again, and skipping the second one leaves the offer PENDING
+   * for ever.
+   */
+  id?: string;
   from: string;
   body: string;
   receivedAt: string;
@@ -38,6 +47,11 @@ let customProvider: SmsProvider | null = null;
 /** Tests inject a fake. Production uses Textbee. */
 export function setSmsProvider(p: SmsProvider | null) {
   customProvider = p;
+}
+
+/** True while a fake provider is installed, so callers can skip the key check. */
+export function isFakeProvider(): boolean {
+  return customProvider !== null;
 }
 
 export function getTextbeeBaseUrl(): string {
@@ -98,26 +112,25 @@ export class TextbeeSmsProvider implements SmsProvider {
     if (!res.ok) {
       throw new Error(`Textbee poll failed with HTTP ${res.status}`);
     }
+    // Textbee returns `_id`, `sender` and `message` on each received row.
+    // The other names are accepted so a field rename does not break the poll.
+    type TextbeeInboundRow = {
+      _id?: string;
+      id?: string;
+      from?: string;
+      sender?: string;
+      body?: string;
+      message?: string;
+      receivedAt?: string;
+      createdAt?: string;
+    };
     const data = (await res.json().catch(() => ({}))) as {
-      data?: Array<{
-        from?: string;
-        sender?: string;
-        body?: string;
-        message?: string;
-        receivedAt?: string;
-        createdAt?: string;
-      }>;
-      messages?: Array<{
-        from?: string;
-        sender?: string;
-        body?: string;
-        message?: string;
-        receivedAt?: string;
-        createdAt?: string;
-      }>;
+      data?: TextbeeInboundRow[];
+      messages?: TextbeeInboundRow[];
     };
     const list = data.data ?? data.messages ?? [];
     return list.map((m) => ({
+      id: m._id ?? m.id,
       from: m.from ?? m.sender ?? "",
       body: m.body ?? m.message ?? "",
       receivedAt: m.receivedAt ?? m.createdAt ?? new Date().toISOString(),

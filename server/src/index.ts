@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { getHmacSecret } from "./lib/hashChain";
-import { parseReply, pollInbound } from "./lib/sms";
+import { pollAndApplyInbound } from "./lib/inbound";
 import { authRouter } from "./routes/auth";
 import { discoveryRouter } from "./routes/discovery";
 import { offersRouter } from "./routes/offers";
@@ -55,15 +55,15 @@ app.listen(PORT, () => {
 
   // ADR-0008: inbound is a poll of Textbee on localhost. Webhook comes later.
   // Only runs when a key is set, so local dev without Textbee is quiet.
+  //
+  // The poll applies the reply as well as storing it, because a worker's YES
+  // from their own handset must accept the offer exactly as the website does.
   if (process.env.TEXTBEE_API_KEY) {
     const POLL_MS = 30_000;
     setInterval(async () => {
       try {
-        const stored = await pollInbound();
-        if (stored > 0) console.log(`[sms] polled ${stored} inbound message(s)`);
-        // New bodies go through existing parseReply in routes/sms.ts reply flow.
-        // Poll only stores; parsing here keeps the shape visible in logs.
-        void parseReply;
+        const applied = await pollAndApplyInbound();
+        if (applied > 0) console.log(`[sms] applied ${applied} inbound reply(s)`);
       } catch (e) {
         console.error("[sms] inbound poll failed", e);
       }
