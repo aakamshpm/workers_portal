@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Amended by [ADR-0011](0011-one-time-device-location.md): a worker may also set the location with a one-time device reading, saved only as the nearest town.
 
 ## Context
 

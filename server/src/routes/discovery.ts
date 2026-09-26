@@ -2,32 +2,43 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../lib/auth";
+import { nearestPlace, searchPlaces } from "../lib/places";
 
 export const discoveryRouter = Router();
 
 discoveryRouter.use(requireAuth);
 
+/** The fields /toggle and /me return, and nothing else, so no id or phone leaks. */
+const profileSelect = {
+  looking: true,
+  latitude: true,
+  longitude: true,
+  locationName: true,
+  preferredWorkType: true,
+} as const;
+
 const toggleSchema = z.object({
   looking: z.boolean({ error: "Say whether you are looking" }),
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
+  locationName: z.string().trim().min(1).max(120).optional(),
   preferredWorkType: z.string().max(120).optional(),
 });
 
 /**
  * POST /api/discovery/toggle
- * Worker or contractor turns visibility on/off and stores a typed location.
- * Location is what they typed or confirmed, not a live stream.
+ * Worker or contractor turns visibility on or off. The location is a chosen
+ * town (ADR-0011), never the phone's exact position.
  */
 discoveryRouter.post("/toggle", requireRole("WORKER", "CONTRACTOR"), async (req, res) => {
   const parsed = toggleSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
   }
-  const { looking, latitude, longitude, preferredWorkType } = parsed.data;
+  const { looking, latitude, longitude, locationName, preferredWorkType } = parsed.data;
 
-  if (looking && (latitude === undefined || longitude === undefined)) {
-    return res.status(400).json({ error: "Latitude and longitude are required when looking is true" });
+  if (looking && (latitude === undefined || longitude === undefined || !locationName)) {
+    return res.status(400).json({ error: "Choose the town where you are first" });
   }
 
   const updated = await prisma.user.update({
@@ -36,17 +47,65 @@ discoveryRouter.post("/toggle", requireRole("WORKER", "CONTRACTOR"), async (req,
       looking,
       latitude: looking ? latitude! : null,
       longitude: looking ? longitude! : null,
-      preferredWorkType: preferredWorkType?.trim() || null,
+      locationName: looking ? locationName! : null,
+      // Left out means keep it, so turning visibility off does not erase it.
+      ...(preferredWorkType !== undefined
+        ? { preferredWorkType: preferredWorkType.trim() || null }
+        : {}),
     },
-    select: {
-      looking: true,
-      latitude: true,
-      longitude: true,
-      preferredWorkType: true,
-    },
+    select: profileSelect,
   });
 
   return res.json(updated);
+});
+
+/**
+ * GET /api/discovery/me
+ * The caller's own saved visibility, so Find Work / Find Workers can open with
+ * the current state instead of an empty form. Same fields as /toggle.
+ */
+discoveryRouter.get("/me", requireRole("WORKER", "CONTRACTOR"), async (req, res) => {
+  const me = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: profileSelect,
+  });
+  if (!me) return res.status(404).json({ error: "Account not found" });
+  return res.json(me);
+});
+
+const placeQuery = z.object({
+  q: z.string().trim().min(2, "Type at least 2 letters").max(60),
+});
+
+/**
+ * GET /api/discovery/places?q=perum
+ * Kerala towns matching what the worker typed (ADR-0010). Photon first, the
+ * district towns when Photon fails.
+ */
+discoveryRouter.get("/places", requireRole("WORKER", "CONTRACTOR"), async (req, res) => {
+  const parsed = placeQuery.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid search" });
+  }
+  return res.json(await searchPlaces(parsed.data.q));
+});
+
+const pointQuery = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
+
+/**
+ * GET /api/discovery/places/nearest?lat=..&lng=..
+ * The town nearest a one-time "Use my location" reading (ADR-0011). The
+ * reading is rounded before Photon sees it, and it is never stored.
+ */
+discoveryRouter.get("/places/nearest", requireRole("WORKER", "CONTRACTOR"), async (req, res) => {
+  const parsed = pointQuery.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Give lat and lng" });
+  }
+  return res.json(await nearestPlace(parsed.data.lat, parsed.data.lng));
 });
 
 const nearbyQuery = z.object({

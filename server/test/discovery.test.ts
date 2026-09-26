@@ -5,16 +5,14 @@ import express from "express";
 import bcrypt from "bcryptjs";
 
 /**
- * Phase 1 Platform - Discovery API slice.
- * Contract: docs/contracts/discovery.md, ADR-0006.
+ * Discovery routes. Contract: docs/contracts/discovery.md. ADR-0006, ADR-0011.
  *
- * - POST /api/discovery/toggle (worker/contractor, typed location)
+ * - POST /api/discovery/toggle (worker/contractor, a chosen town)
+ * - GET /api/discovery/me (the caller's own saved state)
  * - GET /api/discovery/nearby-work (worker, contractors + businesses)
  * - GET /api/discovery/nearby-workers (contractor, workers, distanceKm only)
- * - Distance via PostGIS ST_DWithin. No live coordinates in response.
+ * - Distance via PostGIS ST_DWithin. No live coordinates in the response.
  */
-
-if (!process.env.HMAC_SECRET) process.env.HMAC_SECRET = "test-key-for-hmac-swap";
 
 async function makeApp() {
   const { discoveryRouter } = await import("../src/routes/discovery.js");
@@ -79,6 +77,7 @@ describe("discovery api", () => {
         looking: true,
         latitude: 9.9816,
         longitude: 76.2999,
+        locationName: "Ernakulam",
         preferredWorkType: "Painting",
       },
     });
@@ -119,7 +118,7 @@ describe("discovery api", () => {
     await prisma.$disconnect();
   });
 
-  it("POST /toggle stores typed location and returns profile fields only", async () => {
+  async function toggle(body: Record<string, unknown>) {
     const app = await makeApp();
     const { base, close } = await listen(app);
     try {
@@ -129,43 +128,62 @@ describe("discovery api", () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${workerToken}`,
         },
-        body: JSON.stringify({
-          looking: true,
-          latitude: 9.9816,
-          longitude: 76.2999,
-          preferredWorkType: "Painting",
-        }),
+        body: JSON.stringify(body),
       });
-      assert.equal(res.status, 200);
-      const body = (await res.json()) as Record<string, unknown>;
-      assert.equal(body["looking"], true);
-      assert.equal(body["latitude"], 9.9816);
-      assert.equal(body["longitude"], 76.2999);
-      assert.equal(body["preferredWorkType"], "Painting");
-      // Returns profile fields only, no id/phone/company leak.
-      assert.ok(!("id" in body) || true); // id allowed? contract says fields only
-      assert.ok(!("phone" in body), "must not return phone");
+      return { status: res.status, body: (await res.json()) as Record<string, unknown> };
     } finally {
       await close();
     }
+  }
+
+  it("POST /toggle stores the chosen town and returns exactly the profile fields", async () => {
+    const r = await toggle({
+      looking: true,
+      latitude: 9.9816,
+      longitude: 76.2999,
+      locationName: "Ernakulam",
+      preferredWorkType: "Painting",
+    });
+    assert.equal(r.status, 200);
+    // Exactly these five, so no id, phone or company can leak through this route.
+    assert.deepEqual(r.body, {
+      looking: true,
+      latitude: 9.9816,
+      longitude: 76.2999,
+      locationName: "Ernakulam",
+      preferredWorkType: "Painting",
+    });
   });
 
   it("POST /toggle requires lat/lng when looking is true", async () => {
-    const app = await makeApp();
-    const { base, close } = await listen(app);
-    try {
-      const res = await fetch(`${base}/api/discovery/toggle`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${workerToken}`,
-        },
-        body: JSON.stringify({ looking: true }),
-      });
-      assert.equal(res.status, 400);
-    } finally {
-      await close();
-    }
+    const r = await toggle({ looking: true, locationName: "Ernakulam" });
+    assert.equal(r.status, 400);
+  });
+
+  it("POST /toggle requires the town name when looking is true", async () => {
+    // Without a name the page could only show coordinates, which a worker cannot read.
+    const r = await toggle({ looking: true, latitude: 9.9816, longitude: 76.2999 });
+    assert.equal(r.status, 400);
+  });
+
+  it("POST /toggle off clears the location but keeps the work type", async () => {
+    const r = await toggle({ looking: false });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body, {
+      looking: false,
+      latitude: null,
+      longitude: null,
+      locationName: null,
+      preferredWorkType: "Painting",
+    });
+
+    // Opt back in, so the nearby-workers test below still finds this worker.
+    await toggle({
+      looking: true,
+      latitude: 9.975,
+      longitude: 76.29,
+      locationName: "Ernakulam",
+    });
   });
 
   it("GET /nearby-work returns contractors and businesses within 25km", async () => {
@@ -232,6 +250,82 @@ describe("discovery api", () => {
       assert.equal(r1.status, 401);
       const r2 = await fetch(`${base}/api/discovery/nearby-workers?lat=9.98&lng=76.3`);
       assert.equal(r2.status, 401);
+      const r3 = await fetch(`${base}/api/discovery/me`);
+      assert.equal(r3.status, 401);
+    } finally {
+      await close();
+    }
+  });
+
+  /**
+   * GET /me exists so Find Work can open with the user's saved state.
+   * Without it the page cannot tell "not opted in" from "opted in at a place
+   * I typed last week", and would show an empty form either way.
+   */
+  it("GET /me returns exactly the saved visibility fields", async () => {
+    const app = await makeApp();
+    const { base, close } = await listen(app);
+    try {
+      const res = await fetch(`${base}/api/discovery/me`, {
+        headers: { Authorization: `Bearer ${contractorToken}` },
+      });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as Record<string, unknown>;
+      assert.deepEqual(body, {
+        looking: true,
+        latitude: 9.9816,
+        longitude: 76.2999,
+        locationName: "Ernakulam",
+        preferredWorkType: "Painting",
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it("GET /me gives the empty state to someone who never opted in", async () => {
+    const { prisma } = await import("../src/lib/prisma.js");
+    const { signToken } = await import("../src/lib/auth.js");
+    const fresh = await prisma.user.create({
+      data: { phone: "9999999913", name: "Never Opted In", role: "WORKER", pin: "hashed" },
+    });
+    const token = signToken({ id: fresh.id, name: fresh.name, phone: fresh.phone, role: "WORKER" });
+
+    const app = await makeApp();
+    const { base, close } = await listen(app);
+    try {
+      const res = await fetch(`${base}/api/discovery/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), {
+        looking: false,
+        latitude: null,
+        longitude: null,
+        locationName: null,
+        preferredWorkType: null,
+      });
+    } finally {
+      await close();
+      await prisma.user.delete({ where: { id: fresh.id } });
+    }
+  });
+
+  it("GET /me refuses a labour officer, who has no directory entry", async () => {
+    const { signToken } = await import("../src/lib/auth.js");
+    const token = signToken({
+      id: "officer-without-row",
+      name: "Officer",
+      phone: "9999999914",
+      role: "AUTHORITY",
+    });
+    const app = await makeApp();
+    const { base, close } = await listen(app);
+    try {
+      const res = await fetch(`${base}/api/discovery/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(res.status, 403);
     } finally {
       await close();
     }

@@ -182,6 +182,55 @@ export interface SmsMessage {
   createdAt: string;
 }
 
+// --- discovery (docs/contracts/discovery.md) --------------------------------
+
+/**
+ * What GET /me and POST /toggle both return. The location is a chosen town
+ * (ADR-0011), never the phone's exact position.
+ */
+export interface DiscoveryProfile {
+  looking: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  locationName: string | null;
+  preferredWorkType: string | null;
+}
+
+/** A Kerala town, from Photon or from the district-town fallback (ADR-0010). */
+export interface Place {
+  name: string;
+  /** Taluk or district, to tell two towns with the same name apart. */
+  area: string | null;
+  latitude: number;
+  longitude: number;
+}
+
+export type PlaceSource = "photon" | "fallback";
+
+export interface NearbyContractor {
+  id: string;
+  name: string;
+  phone: string;
+  company: string | null;
+  preferredWorkType: string | null;
+  distanceKm: number;
+}
+
+/** A business on the public map. Not a job, and the page must say so. */
+export interface NearbyBusiness {
+  id: string;
+  name: string;
+  category: string;
+  phone: string | null;
+  distanceKm: number;
+  source: "public_listing";
+}
+
+export interface NearbyWork {
+  contractors: NearbyContractor[];
+  businesses: NearbyBusiness[];
+}
+
 export interface SmsInbox {
   simulated: boolean;
   phone: string;

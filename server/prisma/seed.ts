@@ -102,8 +102,8 @@ async function main() {
   const pin = await bcrypt.hash(DEMO_PIN, 10);
 
   // --- people -------------------------------------------------------------
-  // Coordinates are typed locations around Ernakulam (opt-in directory,
-  // ADR-0006). They are not live GPS.
+  // Each location is a chosen town (ADR-0011), stored with the name Photon gives
+  // for that point, so the page shows it without a lookup. Never live GPS.
   const ramesh = await prisma.user.create({
     data: {
       name: "Ramesh Pillai",
@@ -116,6 +116,7 @@ async function main() {
       looking: true,
       latitude: 9.9816,
       longitude: 76.2999,
+      locationName: "Elamkulam",
       preferredWorkType: "Painting",
     },
   });
@@ -132,6 +133,7 @@ async function main() {
       looking: false,
       latitude: 10.0261,
       longitude: 76.3125,
+      locationName: "Edappally",
       preferredWorkType: "Plywood",
     },
   });
@@ -159,6 +161,7 @@ async function main() {
       looking: true,
       latitude: 9.975,
       longitude: 76.29,
+      locationName: "Gandhi Nagar",
       preferredWorkType: "Painting",
     },
   });
@@ -174,6 +177,7 @@ async function main() {
       looking: true,
       latitude: 9.99,
       longitude: 76.31,
+      locationName: "Pallinada",
       preferredWorkType: "Construction - shuttering",
     },
   });
@@ -189,6 +193,7 @@ async function main() {
       looking: false,
       latitude: 10.015,
       longitude: 76.34,
+      locationName: "Kakkanad",
       preferredWorkType: "Plywood unit - press operation",
     },
   });
@@ -204,6 +209,7 @@ async function main() {
       looking: true,
       latitude: 9.97,
       longitude: 76.28,
+      locationName: "Shenoys",
       preferredWorkType: "Plywood unit - grading and stacking",
     },
   });

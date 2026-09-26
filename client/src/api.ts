@@ -5,9 +5,13 @@ import type {
   ContractBalance,
   Disagreement,
   DirectoryAccount,
+  DiscoveryProfile,
   DisputedRecord,
   LedgerResponse,
+  NearbyWork,
   Offer,
+  Place,
+  PlaceSource,
   PaymentRow,
   PendingCode,
   Person,
@@ -220,6 +224,40 @@ export const api = {
     reference: string;
     note?: string;
   }) => request("/api/payments/reference", { method: "POST", body: JSON.stringify(input) }),
+
+  // --- nearby search (docs/contracts/discovery.md) -------------------------
+
+  /** Your own saved visibility, so the page opens where you left it. */
+  discoveryMe: () => request<DiscoveryProfile>("/api/discovery/me"),
+
+  /** Turn visibility on or off. The location is a chosen town, never a GPS reading. */
+  discoveryToggle: (input: {
+    looking: boolean;
+    latitude?: number;
+    longitude?: number;
+    locationName?: string;
+    preferredWorkType?: string;
+  }) =>
+    request<DiscoveryProfile>("/api/discovery/toggle", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  /** Kerala towns matching what the worker typed. The server asks Photon. */
+  searchPlaces: (q: string) =>
+    request<{ places: Place[]; source: PlaceSource }>(
+      `/api/discovery/places?q=${encodeURIComponent(q)}`,
+    ),
+
+  /** The town nearest a one-time "Use my location" reading. */
+  nearestPlace: (lat: number, lng: number) =>
+    request<{ place: Place | null; source: PlaceSource }>(
+      `/api/discovery/places/nearest?lat=${lat}&lng=${lng}`,
+    ),
+
+  /** Worker only. Contractors hiring nearby, plus public business listings. */
+  nearbyWork: (lat: number, lng: number, radiusKm = 25) =>
+    request<NearbyWork>(`/api/discovery/nearby-work?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
 
   // --- SMS simulation ------------------------------------------------------
   sms: () => request<SmsInbox>("/api/sms"),

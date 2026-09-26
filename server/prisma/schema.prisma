@@ -55,12 +55,18 @@ model User {
   selfRegistered Boolean @default(false)
 
   // -------------------------------------------------------------------------
-  // Opt-in directory (ADR-0006). Typed location only, never live GPS.
+  // Opt-in directory (ADR-0006, ADR-0011). The location is a chosen town,
+  // never the phone's exact position and never a live GPS stream.
   // `looking` means "looking for work" for a worker, "hiring" for a contractor.
+  //
+  // `locationName` is stored with the coordinates so the page can say
+  // "near Perumbavoor" without asking Photon again. A reverse lookup of the
+  // coordinates would often return a street, not the town the worker chose.
   // -------------------------------------------------------------------------
   looking           Boolean @default(false)
   latitude          Float?
   longitude         Float?
+  locationName      String?
   preferredWorkType String?
 
   createdAt DateTime @default(now())
@@ -558,6 +564,22 @@ model DisputeReview {
   // review, so the file never holds two conflicting closures.
   @@unique([targetType, targetId])
   @@index([offerId])
+}
+
+// ---------------------------------------------------------------------------
+// District towns, the fallback for place search (ADR-0010).
+//
+// When Photon fails or is slow, a worker can still choose one of these 14
+// towns. The rows are written by the migration, not by the seed, so every
+// database has them and a reseed never removes them.
+// ---------------------------------------------------------------------------
+model Town {
+  id        String @id
+  name      String @unique
+  // The district the town is in, shown next to the name.
+  area      String
+  latitude  Float
+  longitude Float
 }
 
 // ---------------------------------------------------------------------------

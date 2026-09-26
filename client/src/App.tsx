@@ -18,6 +18,7 @@ import PaymentProofPage from "./pages/PaymentProofPage";
 import ComplaintPage from "./pages/ComplaintPage";
 import LedgerView from "./pages/LedgerView";
 import SmsView from "./pages/SmsView";
+import FindWorkPage from "./pages/FindWorkPage";
 
 const ROLE_LABEL: Record<Role, string> = {
   CONTRACTOR: "Contractor",
@@ -40,6 +41,7 @@ const ROLE_LABEL: Record<Role, string> = {
 const TABS: Record<Role, { path: string; label: string }[]> = {
   WORKER: [
     { path: "/work", label: "My work" },
+    { path: "/find-work", label: "Find work" },
     { path: "/help", label: "Ask for help" },
     { path: "/phone", label: "My phone" },
     { path: "/records", label: "All records" },
@@ -75,6 +77,9 @@ export default function App() {
       <Route element={<Shell user={user} onSignedOut={() => setUser(null)} />}>
         <Route path="/work" element={<Guard user={user} role="WORKER" />}>
           <Route index element={<WorkerRoute user={user!} />} />
+        </Route>
+        <Route path="/find-work" element={<Guard user={user} role="WORKER" />}>
+          <Route index element={<FindWorkPage />} />
         </Route>
         <Route path="/help" element={<Guard user={user} role="WORKER" />}>
           <Route index element={<ComplaintPage user={user!} />} />

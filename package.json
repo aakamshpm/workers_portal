@@ -9,7 +9,7 @@
     "db:up": "docker compose -f compose/docker-compose.yml up -d",
     "db:down": "docker compose -f compose/docker-compose.yml down",
     "seed": "npm --prefix server run db:seed",
-    "test": "npm --prefix server test",
+    "test": "npm --prefix server test && npm --prefix client test",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck"
   },
   "devDependencies": {

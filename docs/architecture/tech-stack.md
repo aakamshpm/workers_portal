@@ -13,5 +13,7 @@ Locked. Change only with a new ADR.
 | Mobile | PWA | 0005 |
 | SMS | Textbee hosted API + one Android SIM | 0008 |
 | Maps | Leaflet + OpenStreetMap tiles | — |
+| Page tests | Vitest + Testing Library + jsdom | 0009 |
+| Place search | Photon (OpenStreetMap), called by the server, district-town fallback | 0010, 0011 |
 
 Local run: API and Vite on the host. Postgres runs in Docker.
