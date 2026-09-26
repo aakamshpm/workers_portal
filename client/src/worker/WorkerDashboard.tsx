@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api";
-import type { AuthUser, AwaitingItem, ContractBalance, Disagreement, Offer } from "../types";
-import BalanceCard from "../components/BalanceCard";
-import DisagreementList from "../components/DisagreementList";
+import { api } from "../shared/api";
+import type { AuthUser, AwaitingItem, ContractBalance, Disagreement, Offer } from "../shared/types";
+import BalanceCard from "../shared/components/BalanceCard";
+import DisagreementList from "../shared/components/DisagreementList";
 import {
   Button,
   Card,
@@ -16,7 +16,7 @@ import {
   inputClass,
   OfferBadge,
   SuccessNote,
-} from "../components/ui";
+} from "../shared/components/ui";
 
 /**
  * What the worker sees.

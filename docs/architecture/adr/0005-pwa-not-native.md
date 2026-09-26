@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. Refined by [ADR-0012](0012-three-apps-one-vite-project.md): the manifest belongs to the worker and contractor apps only, and the officer app has none.
 
 ## Context
 

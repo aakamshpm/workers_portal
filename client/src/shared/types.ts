@@ -166,22 +166,6 @@ export interface VerificationResult {
   checkedAt: string;
 }
 
-export interface SmsMessage {
-  id: string;
-  direction: "IN" | "OUT";
-  body: string;
-  /**
-   * The same message in English. Null when `body` is already English, so a null
-   * here means there is nothing to translate rather than that a translation is
-   * missing.
-   */
-  bodyEn: string | null;
-  language: string;
-  kind: string;
-  reference: string | null;
-  createdAt: string;
-}
-
 // --- discovery (docs/contracts/discovery.md) --------------------------------
 
 /**
@@ -229,13 +213,6 @@ export interface NearbyBusiness {
 export interface NearbyWork {
   contractors: NearbyContractor[];
   businesses: NearbyBusiness[];
-}
-
-export interface SmsInbox {
-  simulated: boolean;
-  phone: string;
-  messages: SmsMessage[];
-  awaitingReply: string[];
 }
 
 export type ComplaintStatus =

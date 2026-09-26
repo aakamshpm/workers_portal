@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, storeSession } from "../api";
-import type { AuthUser, DirectoryAccount } from "../types";
-import { Button, ErrorNote, Field, InfoNote, formatPhone, inputClass } from "../components/ui";
+import { api, storeSession } from "../shared/api";
+import type { AuthUser, DirectoryAccount } from "../shared/types";
+import { Button, ErrorNote, Field, InfoNote, formatPhone, inputClass } from "../shared/components/ui";
 
 const ROLE_LABEL: Record<string, string> = {
   WORKER: "Workers",

@@ -548,8 +548,8 @@ complaintsRouter.post("/:id/contact", requireRole("AUTHORITY"), async (req, res)
     },
   });
 
-  // A portal message also reaches the worker's SMS page, because that is the
-  // channel they actually read.
+  // A portal message is also sent to the worker's phone by SMS, because that is
+  // the channel he actually reads.
   if (parsed.data.kind === "MESSAGED_WORKER") {
     const link = await prisma.ledgerEntry.findFirst({
       where: { recordType: "ACCEPT", recordId: complaint.offerId },

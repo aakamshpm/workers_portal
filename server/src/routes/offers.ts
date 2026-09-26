@@ -241,8 +241,8 @@ const respondSchema = z.object({
 // ---------------------------------------------------------------------------
 // PATCH /api/offers/:id/respond
 //
-// The worker accepts or refuses, from the website. The SMS route does the same
-// thing through /api/sms/reply.
+// The worker accepts or refuses, from the website. A YES or NO sent from his
+// phone does the same thing through the inbound poll (lib/inbound.ts).
 //
 // On acceptance a second record is sealed: the worker's own YES, against the exact
 // figures. From that moment the terms are locked - there is no route anywhere in
@@ -676,9 +676,9 @@ const confirmSchema = z.object({
 // ---------------------------------------------------------------------------
 // POST /api/offers/confirm
 //
-// The worker answers a work or payment record from the website. The SMS route
-// does the same thing through /api/sms/reply, and both call the same function so
-// the two channels cannot drift apart.
+// The worker answers a work or payment record from the website. An OK or WRONG
+// sent from his phone does the same thing through the inbound poll, and both
+// call the same function so the two channels cannot drift apart.
 // ---------------------------------------------------------------------------
 offersRouter.post("/confirm", requireRole("WORKER"), async (req, res) => {
   const parsed = confirmSchema.safeParse(req.body);

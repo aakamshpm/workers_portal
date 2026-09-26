@@ -13,7 +13,7 @@ Workers receive SMS on their own phone. The team develops on localhost and is no
 - `SmsProvider` calls `https://api.textbee.dev`.
 - Do not self-host Textbee.
 - Outbound: POST send-sms from localhost. Inbound: poll GET messages on localhost. A public webhook is a later milestone.
-- `SmsMessage` is the audit log. `/phone` is not the worker’s handset.
+- `SmsMessage` is the record of what was sent and received. The worker reads his messages on his own phone, so no app shows him a copy (ADR-0012). The officer reads the record when handling a dispute.
 - Tests use a fake provider. Tests never call textbee.dev.
 - If `TEXTBEE_API_KEY` is missing, `send()` fails. It does not pretend the message was delivered.
 

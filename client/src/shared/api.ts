@@ -15,11 +15,14 @@ import type {
   PaymentRow,
   PendingCode,
   Person,
-  SmsInbox,
   TrackRecord,
   VerificationResult,
 } from "./types";
+import { SIGN_IN } from "./apps";
+import { leaveTo } from "./leave";
 
+// One key for all three apps. They share an origin, so signing in once at "/"
+// is enough for whichever app the role opens.
 const TOKEN_KEY = "wage-ledger-token";
 const USER_KEY = "wage-ledger-user";
 
@@ -65,11 +68,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (res.status === 401) {
-    // Token expired or invalid. Drop it and go to the sign-in screen rather than
-    // looping on failed requests. `replace` is used so the page that failed does
-    // not stay in the browser's history and catch the Back button.
+    // Token expired or invalid. Drop it and go to the sign-in page at "/"
+    // rather than looping on failed requests (ADR-0012).
     clearSession();
-    window.location.replace("/login");
+    leaveTo(SIGN_IN);
     throw new Error("Your session ended. Please sign in again.");
   }
 
@@ -258,15 +260,6 @@ export const api = {
   /** Worker only. Contractors hiring nearby, plus public business listings. */
   nearbyWork: (lat: number, lng: number, radiusKm = 25) =>
     request<NearbyWork>(`/api/discovery/nearby-work?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
-
-  // --- SMS simulation ------------------------------------------------------
-  sms: () => request<SmsInbox>("/api/sms"),
-
-  smsReply: (body: string) =>
-    request<{ understood: boolean; intent?: string; message?: string; ref?: string }>(
-      "/api/sms/reply",
-      { method: "POST", body: JSON.stringify({ body }) },
-    ),
 
   // --- complaints ----------------------------------------------------------
   complaintCategories: () =>

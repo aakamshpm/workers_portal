@@ -9,7 +9,6 @@ import { offersRouter } from "./routes/offers";
 import { paymentsRouter } from "./routes/payments";
 import { ledgerRouter } from "./routes/ledger";
 import { complaintsRouter } from "./routes/complaints";
-import { smsRouter } from "./routes/sms";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -30,7 +29,6 @@ app.use("/api/offers", offersRouter);
 app.use("/api/payments", paymentsRouter);
 app.use("/api/ledger", ledgerRouter);
 app.use("/api/complaints", complaintsRouter);
-app.use("/api/sms", smsRouter);
 
 // 404 for unknown API paths, so a typo returns JSON rather than HTML.
 app.use("/api", (_req, res) => {

@@ -10,10 +10,12 @@ import { prisma } from "./prisma";
  * is a POST from the API, inbound is a poll of Textbee. Public webhook comes
  * last.
  *
- * Every message is also written to SmsMessage as an audit log. The worker's
- * "My SMS" page reads that table. Tests inject a fake provider and never call
- * textbee.dev. If TEXTBEE_API_KEY is missing, send() fails and writes no row
- * that looks delivered.
+ * Every message is also written to SmsMessage as a record of what was sent and
+ * received. The worker reads his messages on his own phone, so no page shows
+ * this table. Inbound replies are applied by `pollAndApplyInbound` in
+ * inbound.ts. Tests inject a fake provider and never call textbee.dev. If
+ * TEXTBEE_API_KEY is missing, send() fails and writes no row that looks
+ * delivered.
  * ===========================================================================
  */
 
@@ -239,67 +241,6 @@ export async function send(input: {
   });
 }
 
-/**
- * Poll Textbee for inbound messages and store new replies.
- *
- * Each new body is passed through existing parseReply so the same forgiving
- * parser handles gateway replies and manual /phone replies. This function
- * stores the reply; routes/sms.ts reply flow applies the record change.
- */
-export async function pollInbound(): Promise<number> {
-  const provider = getSmsProvider();
-  if (!provider.fetchInbound) return 0;
-  if (customProvider === null && !getTextbeeApiKey()) return 0;
-
-  const inbound = await provider.fetchInbound();
-  let stored = 0;
-  for (const msg of inbound) {
-    // Pass through the existing parser first, so unknown shapes are still
-    // stored but visible as UNKNOWN in logs.
-    const parsed = parseReply(msg.body);
-    void parsed.intent;
-    const digits = msg.from.replace(/\D/g, "").slice(-10);
-    if (digits.length !== 10) continue;
-    const user = await prisma.user.findUnique({ where: { phone: digits } });
-    if (!user) continue;
-    // Avoid storing the same body twice within the same minute.
-    const recent = await prisma.smsMessage.findFirst({
-      where: { userId: user.id, direction: "IN", body: msg.body },
-      orderBy: { createdAt: "desc" },
-    });
-    if (recent) continue;
-    await prisma.smsMessage.create({
-      data: {
-        userId: user.id,
-        direction: "IN",
-        body: msg.body,
-        language: "en",
-        kind: "REPLY",
-      },
-    });
-    stored += 1;
-  }
-  return stored;
-}
-
-/** Store the worker's inbound reply, so the conversation reads correctly. */
-export async function record_incoming(input: {
-  userId: string;
-  body: string;
-  kind: string;
-  reference?: string;
-}) {
-  return prisma.smsMessage.create({
-    data: {
-      userId: input.userId,
-      direction: "IN",
-      body: input.body,
-      language: "en",
-      kind: input.kind,
-      reference: input.reference ?? null,
-    },
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Message text

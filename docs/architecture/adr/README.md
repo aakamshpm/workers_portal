@@ -15,3 +15,4 @@ One short file per decision. Next number after the last file. Skill: `write-adr`
 | [0009](0009-client-page-tests.md) | Client page tests with Vitest and Testing Library |
 | [0010](0010-photon-place-search.md) | Place search through Photon, with a district-town fallback |
 | [0011](0011-one-time-device-location.md) | One-time device location, saved as the nearest town |
+| [0012](0012-three-apps-one-vite-project.md) | Three apps from one Vite project |

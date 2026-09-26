@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api";
+import { api } from "../shared/api";
 import type {
   AuthUser,
   Complaint,
@@ -7,9 +7,9 @@ import type {
   Disagreement,
   Offer,
   Person,
-} from "../types";
-import BalanceCard from "../components/BalanceCard";
-import DisagreementList from "../components/DisagreementList";
+} from "../shared/types";
+import BalanceCard from "../shared/components/BalanceCard";
+import DisagreementList from "../shared/components/DisagreementList";
 import {
   Button,
   Card,
@@ -24,7 +24,7 @@ import {
   inputClass,
   OfferBadge,
   SuccessNote,
-} from "../components/ui";
+} from "../shared/components/ui";
 
 const today = () => new Date().toISOString().slice(0, 10);
 

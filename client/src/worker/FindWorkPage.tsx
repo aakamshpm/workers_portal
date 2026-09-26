@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../api";
-import type { DiscoveryProfile, NearbyWork, Place, PlaceSource } from "../types";
-import { Button, Card, EmptyState, ErrorNote, InfoNote, PhoneLink, inputClass } from "../components/ui";
+import { api } from "../shared/api";
+import type { DiscoveryProfile, NearbyWork, Place, PlaceSource } from "../shared/types";
+import { Button, Card, EmptyState, ErrorNote, InfoNote, PhoneLink, inputClass } from "../shared/components/ui";
 
 /**
  * Find Work. Contract: docs/contracts/discovery.md. ADR-0006, 0010, 0011.

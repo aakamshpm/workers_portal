@@ -18,6 +18,6 @@ The workflow requires a failing test before code, and lists page tests (loading,
 
 ## Consequences
 
-- Tests sit next to the page: `client/src/pages/*.test.tsx`. Run with `npm --prefix client test`.
+- Tests sit next to the page they test, as `*.test.tsx` in the page's app folder (ADR-0012). Run with `npm --prefix client test`.
 - `npm test` at the root runs server and client suites.
 - Teammates on the `ui` agent write page tests the same way.

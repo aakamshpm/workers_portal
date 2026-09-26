@@ -4,7 +4,9 @@ Four people. One person understands the ledger. The others use OpenCode with the
 
 ## May edit
 
-New pages, new components, `client/src/pages/FindWorkPage.tsx`, `client/src/pages/FindWorkersPage.tsx`, PWA files, `client/src/components/MapView.tsx`, copy on existing screens that does not change money logic.
+New pages and components inside the three apps (ADR-0012): `client/src/worker/`, `client/src/contractor/`, `client/src/officer/`, and shared components in `client/src/shared/`. That includes `client/src/worker/FindWorkPage.tsx`, `client/src/contractor/FindWorkersPage.tsx`, PWA files, `client/src/shared/components/MapView.tsx`, and copy on existing screens that does not change money logic.
+
+A page belongs to one app folder. Put it in `shared/` only when more than one app uses it. Officer pages never get a manifest, an install prompt or a hiring map.
 
 ## Must not edit
 

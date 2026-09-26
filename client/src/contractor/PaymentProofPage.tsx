@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api";
-import type { ContractBalance, PaymentRow, PendingCode } from "../types";
+import { api } from "../shared/api";
+import type { ContractBalance, PaymentRow, PendingCode } from "../shared/types";
 import {
   Button,
   Card,
@@ -14,7 +14,7 @@ import {
   InfoNote,
   inputClass,
   SuccessNote,
-} from "../components/ui";
+} from "../shared/components/ui";
 
 const today = () => new Date().toISOString().slice(0, 10);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
-import type { AuthUser, Complaint, ContractBalance } from "../types";
+import { api } from "../shared/api";
+import type { AuthUser, Complaint, ContractBalance } from "../shared/types";
 import {
   Button,
   Card,
@@ -14,7 +14,7 @@ import {
   InfoNote,
   inputClass,
   SuccessNote,
-} from "../components/ui";
+} from "../shared/components/ui";
 
 const LANGUAGES = [
   { id: "en", label: "English" },

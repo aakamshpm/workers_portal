@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api";
-import type { AuthUser, Complaint, DisputedRecord, TrackRecord } from "../types";
+import { api } from "../shared/api";
+import type { AuthUser, Complaint, DisputedRecord, TrackRecord } from "../shared/types";
 import {
   Button,
   Card,
@@ -16,7 +16,7 @@ import {
   inputClass,
   PhoneLink,
   SuccessNote,
-} from "../components/ui";
+} from "../shared/components/ui";
 
 /**
  * Case types as an officer would name them in a file note. The worker sees the

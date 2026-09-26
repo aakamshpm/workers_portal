@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
-import type { LedgerResponse, RecordType, VerificationResult } from "../types";
-import VerifyPanel from "../components/VerifyPanel";
+import { api } from "./api";
+import type { LedgerResponse, RecordType, VerificationResult } from "./types";
+import VerifyPanel from "./components/VerifyPanel";
 import {
   Card,
   EmptyState,
@@ -9,7 +9,7 @@ import {
   RecordTypeBadge,
   formatDate,
   shortCode,
-} from "../components/ui";
+} from "./components/ui";
 
 const FILTERS: { id: RecordType; label: string }[] = [
   { id: "OFFER", label: "Work offered" },

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { DiscoveryProfile, NearbyWork, Place } from "../types";
+import type { DiscoveryProfile, NearbyWork, Place } from "../shared/types";
 
 /**
  * Find Work page. Contract: docs/contracts/discovery.md. ADR-0006, 0010, 0011.
@@ -22,7 +22,7 @@ import type { DiscoveryProfile, NearbyWork, Place } from "../types";
  * The API module is mocked, so no test reaches the server, Photon or textbee.dev.
  */
 
-vi.mock("../api", () => ({
+vi.mock("../shared/api", () => ({
   api: {
     discoveryMe: vi.fn(),
     nearbyWork: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock("../api", () => ({
   },
 }));
 
-import { api } from "../api";
+import { api } from "../shared/api";
 import FindWorkPage from "./FindWorkPage";
 
 const mocked = vi.mocked(api);
