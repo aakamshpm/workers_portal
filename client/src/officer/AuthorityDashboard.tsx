@@ -172,7 +172,7 @@ export default function AuthorityDashboard({ user }: { user: AuthUser }) {
         <>
           <Card
             title={`Needing your attention (${disputes.length})`}
-            description="No complaint was filed for these. The worker was asked to confirm a record and rejected it, so the disagreement is already on file."
+            description="The worker rejected these records. No complaint was filed."
           >
             {disputes.length === 0 ? (
               <EmptyState>Nothing is waiting for you here.</EmptyState>
@@ -199,7 +199,7 @@ export default function AuthorityDashboard({ user }: { user: AuthUser }) {
           {reviewed.length > 0 && (
             <Card
               title={`Already dealt with (${reviewed.length})`}
-              description="These still show that the two sides disagreed. They are off the list above because an officer has looked at them and said why."
+              description="An officer has reviewed these."
             >
               <ul className="divide-y divide-slate-200">
                 {reviewed.map((d) => (
@@ -462,7 +462,6 @@ function ComplaintCase({
               <>
                 <Field
                   label="What do you want to ask the contractor?"
-                  hint="Most of these cases come from careless record-keeping rather than theft. Requesting an explanation first is usually faster than issuing a decision."
                 >
                   <textarea
                     className={inputClass}
@@ -505,11 +504,11 @@ function ComplaintCase({
                   </select>
                 </Field>
                 <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  This system does not place calls. Dial{" "}
+                  Call{" "}
                   {contactKind === "CALLED_WORKER"
                     ? c.raisedBy.phone && <PhoneLink phone={c.raisedBy.phone} />
                     : b?.contractor.phone && <PhoneLink phone={b.contractor.phone} />}{" "}
-                  yourself, then record here what was said.
+                  then write what was said.
                 </div>
                 <Field label="What was said on the call?">
                   <textarea
@@ -553,18 +552,10 @@ function ComplaintCase({
                 </Field>
 
                 {outcome === "UNPROVEN" && (
-                  <InfoNote>
-                    Use this where cash changed hands with no code, no bank reference and no
-                    witness. The disagreement and the absence of proof are both recorded, and
-                    neither party is called dishonest without evidence.
-                  </InfoNote>
+                  <InfoNote>Use when there is no code, no bank number and no witness.</InfoNote>
                 )}
                 {outcome === "SETTLED" && (
-                  <InfoNote>
-                    This is not the same as rejecting the claim. The worker was right and the
-                    contractor paid after you intervened. Recording it as rejected would understate
-                    the worker's case in his own history.
-                  </InfoNote>
+                  <InfoNote>Use when the worker was right and the contractor has now paid.</InfoNote>
                 )}
 
                 <Field label="Reason for the decision" hint="The worker receives this as a message on his phone, so keep it clear enough for him to read.">

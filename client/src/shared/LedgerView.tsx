@@ -8,7 +8,6 @@ import {
   ErrorNote,
   RecordTypeBadge,
   formatDate,
-  shortCode,
 } from "./components/ui";
 
 const FILTERS: { id: RecordType; label: string }[] = [
@@ -22,14 +21,15 @@ const FILTERS: { id: RecordType; label: string }[] = [
 ];
 
 /**
- * The full record list.
+ * The records the reader may see (ADR-0013): a worker his own contracts, a
+ * contractor his own contracts, the labour officer everything. A record only
+ * works as proof if the worker it protects can look at it, and it only stays
+ * private if nobody else can.
  *
- * Visible to every role on purpose: a record only works as proof if the worker it
- * protects can look at it.
- *
- * The two code columns are what make the linking visible — each record's own code
- * is the next record's "follows on from" value. That is the mechanism in one
- * glance, without needing the word "chain" anywhere on the page.
+ * The chain's own numbers and codes are not shown: they mean nothing to the
+ * reader, and for everyone except the officer the numbers would have gaps
+ * where other people's records sit. A changed record is marked in red after
+ * "Check all records".
  */
 export default function LedgerView() {
   const [data, setData] = useState<LedgerResponse | null>(null);
@@ -66,7 +66,7 @@ export default function LedgerView() {
 
       <Card
         title="All records"
-        description="Every job offered, every yes, every day of work, every payment and every answer, in the order they happened. Each line carries a code, and that code also covers the line above it."
+        description="Every offer, day of work and payment on your contracts, oldest first."
         actions={
           <div className="flex flex-wrap rounded-md ring-1 ring-inset ring-slate-300">
             {[{ id: "ALL" as const, label: `All ${all.length}` }, ...FILTERS.map((f) => ({
@@ -94,7 +94,7 @@ export default function LedgerView() {
         ) : entries.length === 0 ? (
           <EmptyState>
             {filter === "ALL"
-              ? "Nothing written down yet. A contractor has to offer work first."
+              ? "Nothing written down yet."
               : "Nothing of that kind yet."}
           </EmptyState>
         ) : (
@@ -102,12 +102,9 @@ export default function LedgerView() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
                 <tr>
-                  <th className="px-5 py-2.5 font-medium">No.</th>
-                  <th className="px-3 py-2.5 font-medium">What kind</th>
+                  <th className="px-5 py-2.5 font-medium">What kind</th>
                   <th className="px-3 py-2.5 font-medium">What was written down</th>
-                  <th className="px-3 py-2.5 font-medium">Day</th>
-                  <th className="px-3 py-2.5 font-medium">Code of the line above</th>
-                  <th className="px-5 py-2.5 font-medium">Its own code</th>
+                  <th className="px-5 py-2.5 font-medium">Day</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -116,15 +113,6 @@ export default function LedgerView() {
                   return (
                     <tr key={e.id} className={bad ? "bg-rose-50" : undefined}>
                       <td className="px-5 py-2.5">
-                        <span
-                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
-                            bad ? "bg-rose-200 text-rose-900" : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {e.chainIndex}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5">
                         <RecordTypeBadge type={e.recordType} />
                       </td>
                       <td className="px-3 py-2.5">
@@ -132,43 +120,14 @@ export default function LedgerView() {
                           {e.summary}
                         </p>
                       </td>
-                      <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-500">
+                      <td className="px-5 py-2.5 text-xs whitespace-nowrap text-slate-500">
                         {formatDate(e.createdAt)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <code title={e.previousHash} className="text-xs text-slate-400">
-                          {shortCode(e.previousHash, 8)}
-                        </code>
-                      </td>
-                      <td className="px-5 py-2.5">
-                        <code
-                          title={e.currentHash}
-                          className={`text-xs ${
-                            bad ? "font-semibold text-rose-700" : "text-slate-600"
-                          }`}
-                        >
-                          {shortCode(e.currentHash, 8)}
-                        </code>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-
-            <div className="space-y-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-500">
-              <p>
-                Look at the last two columns together. Each line's own code becomes the next line's
-                "code of the line above". That is what joins them all in order. If anyone changes one
-                line, the codes below it stop matching.
-              </p>
-              <p>
-                When a job is offered and the worker says yes, those are two separate lines, and the
-                second one writes the daily pay again. We did that on purpose. If someone lowers the
-                daily pay later, both lines stop matching, so the contractor cannot say the worker
-                agreed to the lower pay.
-              </p>
-            </div>
           </div>
         )}
       </Card>

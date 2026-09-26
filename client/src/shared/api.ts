@@ -4,7 +4,6 @@ import type {
   Complaint,
   ContractBalance,
   Disagreement,
-  DirectoryAccount,
   DiscoveryProfile,
   DisputedRecord,
   LedgerResponse,
@@ -101,7 +100,6 @@ export const api = {
 
   states: () => request<{ state: string; language: string }[]>("/api/auth/states"),
 
-  demoAccounts: () => request<DirectoryAccount[]>("/api/auth/demo-accounts"),
 
   // --- offers and contracts ------------------------------------------------
   offers: (status?: string) =>

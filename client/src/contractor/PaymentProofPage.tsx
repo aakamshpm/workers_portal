@@ -98,7 +98,7 @@ export default function PaymentProofPage({
 
       <Card
         title="Pay a worker"
-        description="All three methods are allowed. They do not carry equal weight later, if the worker says he was never paid."
+        description="Choose how you paid."
       >
         <div className="space-y-4 px-5 py-4">
           <Field label="Worker being paid">
@@ -174,7 +174,7 @@ export default function PaymentProofPage({
 
       <Card
         title="Payments already recorded"
-        description="The label on the right shows how strongly each payment could be shown if the worker later says he never received it."
+        description="The label shows what proof each payment has."
       >
         {history.length === 0 ? (
           <EmptyState>No payments recorded yet.</EmptyState>
@@ -266,7 +266,7 @@ function CashCodeFlow({
     try {
       const r = await api.confirmCode({ offerId, code, paidOn, note: note || undefined });
       onDone(
-        `${formatRupees(r.amount)} recorded for ${r.workerName}. He read the code back, so the record shows he was present when you paid.`,
+        `${formatRupees(r.amount)} recorded for ${r.workerName}.`,
       );
       setCode("");
       setAmount("");
@@ -294,10 +294,7 @@ function CashCodeFlow({
               placeholder="8000"
             />
           </Field>
-          <InfoNote>
-            The code is sent only to the worker's phone and is never shown on this screen, so this
-            payment can only be completed while he is standing with you.
-          </InfoNote>
+          <InfoNote>The code goes to the worker's phone. Ask him to read it to you.</InfoNote>
           <Button disabled={busy || !amount} onClick={() => void requestCode()}>
             {busy ? "Sending…" : "Send code to the worker's phone"}
           </Button>
@@ -379,7 +376,7 @@ function TransferForm({
         reference,
         note: note || undefined,
       });
-      onDone("Recorded with the transaction number. The bank holds its own record of this as well.");
+      onDone("Recorded.");
       setAmount("");
       setReference("");
     } catch (err) {
@@ -423,7 +420,7 @@ function TransferForm({
             className={inputClass}
             value={reference}
             onChange={(e) => setReference(e.target.value)}
-            placeholder="UPI/427193006621"
+            placeholder="Reference number"
             required
           />
         </Field>
@@ -445,10 +442,6 @@ function TransferForm({
           placeholder="Final payment, work complete"
         />
       </Field>
-      <InfoNote>
-        This is the strongest way to pay. The bank keeps its own record of the transaction number, so
-        nobody has to believe you or the worker.
-      </InfoNote>
       <Button type="submit" disabled={busy}>
         {busy ? "Saving…" : "Record this payment"}
       </Button>
@@ -482,7 +475,7 @@ function PlainCashForm({
         note: note || undefined,
       });
       onDone(
-        "Recorded. The worker has been asked to confirm it. Until he does, this payment rests on your word alone.",
+        "Recorded. The worker will be asked to confirm it.",
       );
       setAmount("");
     } catch (err) {
@@ -529,11 +522,7 @@ function PlainCashForm({
           placeholder="Advance for travel"
         />
       </Field>
-      <InfoNote>
-        Nothing except your own writing says this payment happened. The worker will be asked about it.
-        If he later says he got nothing, no app can show who is telling the truth. Use the code way
-        when you can.
-      </InfoNote>
+      <InfoNote>The worker will be asked to confirm this payment.</InfoNote>
       <Button type="submit" disabled={busy}>
         {busy ? "Saving…" : "Record without proof"}
       </Button>

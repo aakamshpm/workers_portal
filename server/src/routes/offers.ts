@@ -101,26 +101,30 @@ offersRouter.get("/balances", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/offers/workers?phone=98800
+// GET /api/offers/workers?phone=9880030001
 //
-// Find a worker to send an offer to. A contractor knows the worker's phone number
-// - that is how they met - so lookup is by number rather than by browsing a list
-// of every worker in the state.
+// Find the one worker an offer is for, by his full 10-digit number. A
+// contractor knows the number, because that is how they met.
+//
+// Exact match only (ADR-0013). A partial or empty search used to list every
+// worker and his phone number, including workers who never opted in to the
+// directory. Opted-in workers are found through nearby search instead.
 // ---------------------------------------------------------------------------
 offersRouter.get("/workers", requireRole("CONTRACTOR", "AUTHORITY"), async (req, res) => {
-  const search = typeof req.query.phone === "string" ? req.query.phone.replace(/\D/g, "") : "";
+  const digits = typeof req.query.phone === "string" ? req.query.phone.replace(/\D/g, "") : "";
+  const phone = digits.slice(-10);
 
-  const workers = await prisma.user.findMany({
-    where: {
-      role: "WORKER",
-      ...(search ? { phone: { contains: search } } : {}),
-    },
+  if (phone.length !== 10) {
+    return res.status(400).json({ error: "Type the worker's full 10-digit phone number" });
+  }
+
+  const worker = await prisma.user.findFirst({
+    where: { role: "WORKER", phone },
     select: { id: true, name: true, phone: true, homeState: true, language: true },
-    orderBy: { name: "asc" },
-    take: 20,
   });
 
-  return res.json(workers);
+  // A list, so the page's existing shape does not change: one worker or none.
+  return res.json(worker ? [worker] : []);
 });
 
 const createOfferSchema = z.object({

@@ -1,7 +1,6 @@
 import { Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 import { AppShell, FirstTab, useAppSession, type Tab } from "../shared/AppShell";
 import LedgerView from "../shared/LedgerView";
-import type { AuthUser } from "../shared/types";
 import ContractorDashboard from "./ContractorDashboard";
 import PaymentProofPage from "./PaymentProofPage";
 
@@ -25,7 +24,7 @@ export default function ContractorApp() {
   return (
     <AppShell user={user} tabs={TABS}>
       <Routes>
-        <Route path="/workers" element={<Workers user={user} />} />
+        <Route path="/workers" element={<Workers />} />
         <Route path="/pay" element={<Pay />} />
         <Route path="/records" element={<LedgerView />} />
         <Route path="*" element={<FirstTab tabs={TABS} />} />
@@ -34,11 +33,10 @@ export default function ContractorApp() {
   );
 }
 
-function Workers({ user }: { user: AuthUser }) {
+function Workers() {
   const navigate = useNavigate();
   return (
     <ContractorDashboard
-      user={user}
       // The contract travels in the address, so this page can be reopened later
       // or shared, and Back returns to the worker list rather than leaving the app.
       onGoToPayment={(offerId) => navigate(`/pay?offer=${encodeURIComponent(offerId)}`)}

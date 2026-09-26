@@ -55,6 +55,15 @@ model User {
   selfRegistered Boolean @default(false)
 
   // -------------------------------------------------------------------------
+  // Wrong-PIN lock (ADR-0013). A four-digit PIN has only 10,000 values, so
+  // after 5 wrong PINs in a row this number cannot sign in for 15 minutes.
+  // Stored on the user, not in memory, so restarting the server does not
+  // hand an attacker a fresh set of tries. A right PIN resets both fields.
+  // -------------------------------------------------------------------------
+  failedPinCount Int       @default(0)
+  lockedUntil    DateTime?
+
+  // -------------------------------------------------------------------------
   // Opt-in directory (ADR-0006, ADR-0011). The location is a chosen town,
   // never the phone's exact position and never a live GPS stream.
   // `looking` means "looking for work" for a worker, "hiring" for a contractor.

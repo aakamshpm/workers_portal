@@ -6,15 +6,19 @@ import { Button, RecordTypeBadge } from "./ui";
 /**
  * The integrity check and its result.
  *
- * Deliberately loud, because this is the moment the project's central claim is
- * either demonstrated or not. Green when every record still matches what was
+ * Green when every record still matches what was
  * originally entered; red when something was changed, naming the record, the
  * field, the original value and the current one.
  *
- * The wording avoids "hash", "seal" and "chain" on purpose. An evaluator, a
- * labour officer and a worker all need to read this panel, and none of them
+ * The wording avoids "hash", "seal" and "chain" on purpose. A labour officer,
+ * a contractor and a worker all need to read this panel, and none of them
  * needs the cryptographic vocabulary to understand what it is telling them. The
  * technical terms live in the code and the README.
+ *
+ * The check covers the whole chain, but the details come only for records the
+ * reader may see (ADR-0013). A problem in someone else's records is reported
+ * as a count, so the panel never says "nothing has been changed" while any
+ * record anywhere is broken.
  */
 export default function VerifyPanel({
   onVerified,
@@ -45,8 +49,7 @@ export default function VerifyPanel({
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Has anyone changed anything?</h2>
           <p className="mt-0.5 max-w-2xl text-xs text-slate-500">
-            This looks at every line again and compares it with what was first written down. If any
-            number is different now, it tells you which one.
+            Checks that no number has changed since it was written down.
           </p>
         </div>
         <Button onClick={run} disabled={busy}>
@@ -75,11 +78,30 @@ export default function VerifyPanel({
                   Nothing has been changed. All {result.entriesChecked} lines are the same.
                 </p>
               </div>
-              <p className="mt-1.5 text-sm text-emerald-800">
-                Every daily pay, every day of work and every payment is still exactly as it was first
-                written down. Nobody has changed anything since then.
-              </p>
               <p className="mt-2 text-xs text-emerald-700">
+                We checked at {new Date(result.checkedAt).toLocaleTimeString("en-IN")}
+              </p>
+            </div>
+          ) : result.failures.length === 0 ? (
+            // Every problem is in records this reader may not see.
+            <div className="rounded-md bg-amber-50 p-4 ring-1 ring-inset ring-amber-200">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="grid size-5 place-items-center rounded-full bg-amber-600 text-xs font-bold text-white"
+                >
+                  !
+                </span>
+                <p className="text-sm font-semibold text-amber-900">
+                  Your own records are unchanged.
+                </p>
+              </div>
+              <p className="mt-1.5 text-sm text-amber-800">
+                We found {result.hiddenFailures} {result.hiddenFailures === 1 ? "problem" : "problems"}{" "}
+                in records that are not yours, so we cannot show them to you. The labour office can
+                see them.
+              </p>
+              <p className="mt-2 text-xs text-amber-700">
                 We checked at {new Date(result.checkedAt).toLocaleTimeString("en-IN")}
               </p>
             </div>
@@ -93,11 +115,17 @@ export default function VerifyPanel({
                   !
                 </span>
                 <p className="text-sm font-semibold text-rose-900">
-                  Someone changed {result.failures.length} line
-                  {result.failures.length === 1 ? "" : "s"}, out of {result.entriesChecked} we
-                  checked
+                  Someone changed {result.failures.length} of your line
+                  {result.failures.length === 1 ? "" : "s"}
                 </p>
               </div>
+              {result.hiddenFailures > 0 && (
+                <p className="mt-1.5 text-sm text-rose-800">
+                  There {result.hiddenFailures === 1 ? "is" : "are"} also {result.hiddenFailures}{" "}
+                  {result.hiddenFailures === 1 ? "problem" : "problems"} in records that are not
+                  yours. The labour office can see them.
+                </p>
+              )}
 
               <ul className="mt-3 space-y-3">
                 {result.failures.map((f, i) => (
@@ -106,9 +134,6 @@ export default function VerifyPanel({
                     className="rounded-md bg-white p-3 ring-1 ring-inset ring-rose-200"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="tnum rounded bg-rose-100 px-1.5 py-0.5 text-xs font-semibold text-rose-800">
-                        Line {f.chainIndex}
-                      </span>
                       <RecordTypeBadge type={f.recordType} />
                     </div>
 
@@ -143,8 +168,8 @@ export default function VerifyPanel({
                       <p className="mt-1.5 text-sm text-slate-600">{f.detail}</p>
                     )}
 
-                    {/* The raw codes stay available, but folded away - useful if
-                        an evaluator asks to see the mechanism. */}
+                    {/* The raw codes stay available, but folded away, for
+                        anyone who needs to check them by hand. */}
                     <details className="mt-2">
                       <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">
                         Show the security codes

@@ -14,9 +14,9 @@ const REVIEW_REASON: Record<string, string> = {
 /**
  * Records the worker rejected, shown to one of the two people involved.
  *
- * One component for both roles, fed by one route, because showing the worker and
- * the contractor different versions of the same disagreement is exactly the
- * problem this project exists to solve. Only the wording changes with `viewer`.
+ * One component for both roles, fed by one route, so the worker and the
+ * contractor are always shown the same facts about the same disagreement. Only
+ * the wording changes with `viewer`.
  *
  * The contractor can add his account here, once. The worker cannot answer back:
  * his rejection is already his statement, and the record he rejected is the
@@ -45,16 +45,16 @@ export default function DisagreementList({
       }
       description={
         isWorker
-          ? "Nobody can change these, not you and not him. Both numbers stay here, and the labour office can see them."
-          : "You cannot change these records, and neither can the worker. What you write here is added to the file so the labour officer reads your side too."
+          ? "The labour office can see these."
+          : "Add your side. The labour officer will read it."
       }
     >
       {!isWorker && unanswered > 0 && (
         <div className="px-5 pt-4">
           <InfoNote>
             {unanswered === 1
-              ? "One of these has no answer from you. If it reaches the labour office like that, the file holds the worker's account and nothing from you."
-              : `${unanswered} of these have no answer from you. If they reach the labour office like that, the file holds the worker's account and nothing from you.`}
+              ? "You have not answered 1 of these."
+              : `You have not answered ${unanswered} of these.`}
           </InfoNote>
         </div>
       )}
@@ -165,18 +165,14 @@ function Row({
         <div className="mt-3 space-y-2">
           <Field
             label="What actually happened?"
-            hint="Write it as you would say it to the labour officer. You can write this once, and it cannot be changed afterwards. The worker will see it."
+            hint="You can write this once. The worker will see it."
           >
             <textarea
               className={inputClass}
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                d.kind === "WORK"
-                  ? "He worked 3 days that week. He was absent Thursday to Saturday, and the site register shows the same."
-                  : "I gave him the money in cash at the site on that day. Nobody else was there, so I have nothing to show for it."
-              }
+              placeholder="What happened?"
             />
           </Field>
           <div className="flex flex-wrap gap-2">
@@ -206,11 +202,9 @@ function Row({
             {formatDate(d.review.at)}
           </p>
           <p className="mt-0.5 text-sm text-slate-700">{d.review.note}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {isWorker
-              ? "The two numbers above stay on the record. If you think this is still wrong, you can ask for help."
-              : "The two numbers above stay on the record. This does not remove the disagreement."}
-          </p>
+          {isWorker && (
+            <p className="mt-1 text-xs text-slate-500">If this is still wrong, ask for help.</p>
+          )}
         </div>
       ) : (
         <p className="mt-3 text-xs text-amber-700">

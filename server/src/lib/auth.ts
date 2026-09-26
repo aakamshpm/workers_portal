@@ -26,11 +26,25 @@ declare global {
   }
 }
 
-const SECRET = process.env.JWT_SECRET ?? "demo-only-secret-change-me";
+/**
+ * The key that signs every session. ADR-0013.
+ *
+ * There is no fallback. A default written in the code would let anyone who has
+ * read the code sign a session for any user, so a missing key stops the
+ * server at startup instead, as HMAC_SECRET does (ADR-0004).
+ */
+export function getJwtSecret(): string {
+  const s = process.env.JWT_SECRET;
+  if (!s) {
+    throw new Error("JWT_SECRET is not set. Set it in server/.env");
+  }
+  return s;
+}
+
 const TOKEN_TTL = "8h";
 
 export function signToken(user: AuthUser): string {
-  return jwt.sign(user, SECRET, { expiresIn: TOKEN_TTL });
+  return jwt.sign(user, getJwtSecret(), { expiresIn: TOKEN_TTL });
 }
 
 /**
@@ -45,7 +59,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
   const token = header.slice("Bearer ".length);
   try {
-    const payload = jwt.verify(token, SECRET) as jwt.JwtPayload & AuthUser;
+    const payload = jwt.verify(token, getJwtSecret()) as jwt.JwtPayload & AuthUser;
     req.user = {
       id: payload.id,
       name: payload.name,

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../shared/api";
 import type {
-  AuthUser,
   Complaint,
   ContractBalance,
   Disagreement,
@@ -37,10 +36,8 @@ const today = () => new Date().toISOString().slice(0, 10);
  * needs room to explain itself.
  */
 export default function ContractorDashboard({
-  user,
   onGoToPayment,
 }: {
-  user: AuthUser;
   onGoToPayment?: (offerId: string) => void;
 }) {
   const [balances, setBalances] = useState<ContractBalance[]>([]);
@@ -104,7 +101,7 @@ export default function ContractorDashboard({
       {needsAnswer.length > 0 && (
         <Card
           title="The labour office has asked you to respond"
-          description="Reply in your own words. Your answer is filed with the complaint. Nothing is decided automatically because of it."
+          description="Your answer is added to the complaint."
         >
           <ul className="divide-y divide-slate-200">
             {needsAnswer.map((c) => (
@@ -215,7 +212,6 @@ export default function ContractorDashboard({
         </Card>
       )}
 
-      <p className="text-center text-xs text-slate-400">Signed in as {user.name}</p>
     </div>
   );
 }
@@ -347,7 +343,7 @@ function SendOfferForm({
               inputMode="numeric"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="98800 30004"
+              placeholder="10-digit phone number"
               required
             />
           </Field>
@@ -425,10 +421,7 @@ function SendOfferForm({
             </div>
           )}
 
-          <InfoNote>
-            Once the worker accepts, this daily rate is fixed. No screen in this system can change
-            it. A mistake has to be corrected by adding a new record, not by editing this one.
-          </InfoNote>
+          <InfoNote>After the worker says yes, this daily pay cannot be changed.</InfoNote>
 
           <Button type="submit" disabled={busy || !found}>
             {busy ? "Sending…" : "Send the offer"}
@@ -566,7 +559,7 @@ function LogWorkForm({
         {chosen && Number(days) > 0 && (
           <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
             <p className="font-medium text-slate-800">
-              This adds a new record. Nothing already saved is changed.
+              After this record:
             </p>
             <dl className="space-y-0.5">
               <div className="flex justify-between gap-3">
@@ -664,7 +657,7 @@ function EmployerReplyRow({
             rows={2}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="The payment is late because the site owner has not given me the money yet. I will pay him on Friday."
+            placeholder="Your answer"
             required
           />
         </Field>

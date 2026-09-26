@@ -82,16 +82,13 @@ export default function WorkerDashboard({
             {balances.length === 1 ? "" : "s"}
           </p>
           <p className="text-3xl font-semibold tabular-nums">{formatRupees(totalOwed)}</p>
-          <p className="mt-1 text-xs text-slate-400">
-            Your daily pay, times the days written down, minus the money you have been given.
-          </p>
         </div>
       )}
 
       {offers.length > 0 && (
         <Card
           title="A contractor is offering you work"
-          description="Look at the daily pay before you answer. After you say yes, nobody can change it — not you and not the contractor."
+          description="Check the daily pay. After you say yes, it cannot be changed."
         >
           <ul className="divide-y divide-slate-200">
             {offers.map((offer) => (
@@ -268,7 +265,6 @@ function OfferRow({
               className={inputClass}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="The pay is less than what he told me on the phone"
             />
           </Field>
           <div className="flex gap-2">
@@ -377,7 +373,7 @@ function AwaitingRow({
         <div className="mt-3 space-y-2 rounded-md bg-rose-50 p-3 ring-1 ring-inset ring-rose-200">
           <Field
             label={isWork ? "How many days did you really work?" : "How much money did you really get?"}
-            hint="Write your own number, so the labour office can see exactly how big the difference is."
+            hint="Write the right number."
           >
             <input
               className={inputClass}
@@ -394,7 +390,6 @@ function AwaitingRow({
               className={inputClass}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={isWork ? "I worked Monday to Saturday" : "He gave me nothing"}
             />
           </Field>
           <div className="flex gap-2">
@@ -405,10 +400,7 @@ function AwaitingRow({
               Go back
             </Button>
           </div>
-          <InfoNote>
-            This does not rub out what the contractor wrote. Both numbers are kept, and the labour
-            office sees both of them.
-          </InfoNote>
+          <InfoNote>The labour office will see both numbers.</InfoNote>
         </div>
       )}
     </li>

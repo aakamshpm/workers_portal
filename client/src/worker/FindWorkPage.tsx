@@ -351,7 +351,7 @@ export default function FindWorkPage() {
             <section aria-label="Contractors hiring">
               <Card
                 title="Contractors hiring"
-                description="These contractors use this system and turned hiring on. An offer from them is sealed when you say yes."
+                description="Contractors near you who are hiring."
               >
                 <ul className="divide-y divide-slate-100">
                   {results.contractors.map((c) => (
@@ -380,7 +380,7 @@ export default function FindWorkPage() {
             <section aria-label="Public business listings">
               <Card
                 title="Public business listings"
-                description="Businesses on the public map. These are not job offers, and nothing here is recorded or sealed."
+                description="These are businesses, not job offers."
               >
                 <ul className="divide-y divide-slate-100">
                   {results.businesses.map((b) => (

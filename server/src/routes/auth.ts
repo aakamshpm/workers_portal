@@ -7,6 +7,18 @@ import { HOME_STATES, STATE_LANGUAGE, type Language } from "../lib/sms";
 
 export const authRouter = Router();
 
+/**
+ * Wrong-PIN lock (ADR-0013).
+ *
+ * A four-digit PIN has 10,000 values. Without a limit, a script can try all of
+ * them in minutes. Five wrong in a row locks the number for 15 minutes, which
+ * makes trying every PIN take weeks, while a worker who mistypes a few times
+ * is not locked out.
+ */
+const MAX_WRONG_PINS = 5;
+const LOCK_MINUTES = 15;
+const LOCKED_MESSAGE = `Too many wrong PINs. Wait ${LOCK_MINUTES} minutes and try again.`;
+
 const loginSchema = z.object({
   phone: z.string().min(6, "Enter your phone number"),
   pin: z.string().min(4, "Enter your 4-digit PIN"),
@@ -30,11 +42,41 @@ authRouter.post("/login", async (req, res) => {
   const phone = normalisePhone(parsed.data.phone);
   const user = await prisma.user.findUnique({ where: { phone } });
 
+  // A locked number is refused before the PIN is even compared, so guessing
+  // during the lock learns nothing, not even whether a guess was right.
+  if (user?.lockedUntil && user.lockedUntil > new Date()) {
+    return res.status(429).json({ error: LOCKED_MESSAGE });
+  }
+
   // Same message whether the number is unknown or the PIN is wrong, so the
   // response does not reveal which numbers are registered.
   const ok = user ? await bcrypt.compare(parsed.data.pin, user.pin) : false;
-  if (!user || !ok) {
+  if (!user) {
     return res.status(401).json({ error: "Wrong phone number or PIN" });
+  }
+
+  if (!ok) {
+    // Counted with an atomic increment, so two wrong guesses sent at the same
+    // moment cannot both read the old count and each add one to it.
+    const after = await prisma.user.update({
+      where: { id: user.id },
+      data: { failedPinCount: { increment: 1 } },
+      select: { failedPinCount: true },
+    });
+    if (after.failedPinCount >= MAX_WRONG_PINS) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000), failedPinCount: 0 },
+      });
+    }
+    return res.status(401).json({ error: "Wrong phone number or PIN" });
+  }
+
+  if (user.failedPinCount > 0 || user.lockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedPinCount: 0, lockedUntil: null },
+    });
   }
 
   const payload = {
@@ -121,35 +163,4 @@ authRouter.post("/register", async (req, res) => {
 /** The home states offered at registration, with the language each implies. */
 authRouter.get("/states", (_req, res) => {
   res.json(HOME_STATES.map((s) => ({ state: s, language: STATE_LANGUAGE[s] })));
-});
-
-/**
- * GET /api/auth/demo-accounts
- *
- * Lists every account so the login screen can help find one during a
- * presentation. Remove this route for real use.
- *
- * PINs are never returned, for anyone. For the seven seeded accounts that PIN is
- * always 1234, printed by the seed script, so the login screen can click straight
- * in. A worker who registered himself chose his own PIN, which this route cannot
- * know, so those accounts are listed to save the trouble of remembering a phone
- * number, but still need the PIN typed - `selfRegistered` is returned so the
- * client can tell the two groups apart and only offer one-click sign-in for the
- * ones where it is actually one click.
- */
-authRouter.get("/demo-accounts", async (_req, res) => {
-  const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-      role: true,
-      homeState: true,
-      language: true,
-      company: true,
-      selfRegistered: true,
-    },
-    orderBy: [{ selfRegistered: "asc" }, { role: "asc" }, { name: "asc" }],
-  });
-  return res.json(users);
 });

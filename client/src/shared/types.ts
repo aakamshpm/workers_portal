@@ -10,20 +10,6 @@ export interface AuthUser {
   company?: string | null;
 }
 
-/**
- * One row on the login screen's "accounts to try" list.
- *
- * Distinct from AuthUser because this is never a signed-in session - it is a
- * directory entry, and `selfRegistered` only makes sense in that context. A
- * seeded account (false) uses the shared PIN 1234 and can sign in with one
- * click. A worker who registered himself (true) chose his own PIN, so his row
- * is shown to save hunting for the phone number, but clicking it still asks
- * for the PIN rather than pretending to sign him in.
- */
-export interface DirectoryAccount extends AuthUser {
-  selfRegistered: boolean;
-}
-
 export interface Person {
   id: string;
   name: string;
@@ -159,10 +145,15 @@ export interface ChainFailure {
   changedFields?: { field: string; original: string; current: string }[];
 }
 
+/** Contract: docs/contracts/ledger.md. */
 export interface VerificationResult {
+  /** About the whole chain, including records the reader cannot see. */
   valid: boolean;
   entriesChecked: number;
+  /** Only problems in records the reader may see. */
   failures: ChainFailure[];
+  /** Problems in records the reader may not see. Always 0 for the officer. */
+  hiddenFailures: number;
   checkedAt: string;
 }
 

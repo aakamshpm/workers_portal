@@ -32,3 +32,8 @@ if (testUrl) {
 if (!process.env.HMAC_SECRET) {
   process.env.HMAC_SECRET = "test-key-for-hmac-swap";
 }
+
+// ADR-0013: the server refuses to run without a JWT secret.
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = "test-jwt-secret";
+}

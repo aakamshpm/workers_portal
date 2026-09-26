@@ -224,26 +224,22 @@ export function EvidenceBadge({ evidence }: { evidence: Evidence }) {
     strong: {
       label: "Bank has a record",
       cls: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-      title:
-        "Sent by UPI or bank transfer, with the transaction number. The bank has its own record of this, so nobody has to believe either side.",
+      title: "Paid by UPI or bank. The bank has a record.",
     },
     good: {
       label: "Code used when paid",
       cls: "bg-sky-50 text-sky-800 ring-sky-200",
-      title:
-        "The worker read a code from his own phone at the moment he was paid. This shows he was there when the money was handed over.",
+      title: "The worker read out a code when he was paid.",
     },
     weak: {
       label: "Worker agreed later",
       cls: "bg-amber-50 text-amber-800 ring-amber-200",
-      title:
-        "The worker said yes some days later, from memory. Better than nothing, but weaker than a code.",
+      title: "The worker agreed some days later.",
     },
     none: {
       label: "Nothing to show",
       cls: "bg-slate-100 text-slate-600 ring-slate-300",
-      title:
-        "Only the contractor says this payment happened. If the worker says it did not, nobody can prove who is right.",
+      title: "Only the contractor says this was paid.",
     },
     disputed: {
       label: "Worker says he got nothing",

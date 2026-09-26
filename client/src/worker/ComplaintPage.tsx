@@ -107,9 +107,7 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
   if (balances.length === 0) {
     return (
       <Card>
-        <EmptyState>
-          You have not taken any job yet, so there is nothing to complain about.
-        </EmptyState>
+        <EmptyState>You have no jobs yet.</EmptyState>
       </Card>
     );
   }
@@ -121,7 +119,7 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
 
       <Card
         title="Ask the labour office for help"
-        description="Your work records are sent along with this. The officer can see your daily pay, your days of work and every payment, without having to ask you."
+        description="Your work records are sent with this."
       >
         <form
           className="space-y-4 px-5 py-4"
@@ -230,15 +228,12 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="I worked 15 days and he has given me no money. Every week he says he will pay me next week."
+              placeholder="What happened?"
               required
             />
           </Field>
 
-          <InfoNote>
-            Sending this does not change any of your records. It opens a case at the labour office.
-            The officer will see both sides, and can ask the contractor to answer.
-          </InfoNote>
+          <InfoNote>This does not change your records. The officer will see both sides.</InfoNote>
 
           <Button type="submit" disabled={busy || description.trim().length < 10 || !category}>
             {busy ? "Sending…" : "Send to the labour office"}

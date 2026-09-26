@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { getHmacSecret } from "./lib/hashChain";
+import { getJwtSecret } from "./lib/auth";
 import { pollAndApplyInbound } from "./lib/inbound";
 import { authRouter } from "./routes/auth";
 import { discoveryRouter } from "./routes/discovery";
@@ -13,8 +14,9 @@ import { complaintsRouter } from "./routes/complaints";
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
 
-// ADR-0004: missing HMAC key fails startup, never uses an empty key.
-getHmacSecret();
+// A missing key fails startup, never falls back to a value in the code.
+getHmacSecret(); // ADR-0004
+getJwtSecret(); // ADR-0013
 
 app.use(cors());
 app.use(express.json());
