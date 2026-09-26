@@ -8,6 +8,7 @@
     "dev": "concurrently --names \"api,web\" --prefix-colors \"blue,magenta\" \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
     "db:up": "docker compose -f compose/docker-compose.yml up -d",
     "db:down": "docker compose -f compose/docker-compose.yml down",
+    "db:migrate": "npm --prefix server run db:migrate",
     "seed": "npm --prefix server run db:seed",
     "test": "npm --prefix server test && npm --prefix client test",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck"

@@ -2,25 +2,28 @@
 
 Skill: `repo-onboarding`.
 
+Needs Node.js 20.19 or newer and Docker.
+
 ```bash
-cp server/.env.example server/.env
-# add TEXTBEE_API_KEY when you have one
 npm install
 npm run db:up
-npm run setup
+npm run setup        # also creates server/.env from .env.example
+npm run db:migrate
 npm run seed
 npm run dev
 ```
 
 API: `http://localhost:4000`. Web: `http://localhost:5173`.
 
-The seed makes worker and contractor accounts with PIN `1234` (`docs/project/current-state.md`), but no officer account, because an officer account is never seeded with a PIN (ADR-0014). Make the first one:
+The seed makes worker, contractor and officer accounts with PIN `1234` (table in `docs/project/current-state.md`). This is for a development database only.
+
+On a real database there is no seed. Make the first officer with:
 
 ```bash
-npm --prefix server run create-officer -- --name "Your Name" --phone 9000020001
+npm --prefix server run create-officer -- --name "Your Name" --phone 9000020002
 ```
 
-Then open `http://localhost:5173/`, tap "Forgot PIN?", and set a PIN for that number. The code goes to the phone the SMS provider is wired to; with no `TEXTBEE_API_KEY` set, it is only in the server log.
+That account has no PIN. Its owner opens `http://localhost:5173/`, taps "Forgot PIN?", and types the code sent to his phone. This needs `TEXTBEE_API_KEY`, because without it no SMS is sent and `POST /api/auth/code` fails.
 
 ## Textbee (human, not an agent)
 
