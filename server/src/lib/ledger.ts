@@ -94,174 +94,233 @@ export async function rebuildPayload(
   recordType: string,
   recordId: string,
 ): Promise<string | null> {
-  if (recordType === "OFFER") {
-    const o = await prisma.workOffer.findUnique({ where: { id: recordId } });
-    if (!o) return null;
-    return canonicalPayload({
-      type: "OFFER",
-      workerId: o.workerId,
-      contractorId: o.contractorId,
-      dailyRate: o.dailyRate,
-      workType: o.workType,
-      siteName: o.siteName,
-      startDate: o.startDate.toISOString(),
-      expectedDays: o.expectedDays,
-      extraTerms: o.extraTerms ?? "",
-    });
+  const [text] = await rebuildPayloads([{ recordType, recordId }]);
+  return text ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Batched rebuild.
+//
+// verifyLedger() used to call rebuildPayload() once per ledger row, all at the
+// same time. That is one database query per row, and the time grew faster than
+// the ledger: 90 ms at 1,000 rows, 9.2 s at 20,000, and one run at 1,00,000 did
+// not finish in 18 minutes (docs/research/results/verify_bench.csv).
+//
+// This reads the live rows with one query per table instead, whatever the
+// number of records, and rebuilds each text in memory. It is still the LIVE
+// row that is read, never LedgerEntry.payload, so a change made straight in
+// the database is still caught (current-state.md, invariant 1).
+//
+// rebuildPayload() above is this function with one record, so the single-row
+// and the batched rebuild cannot produce different text for the same row.
+// ---------------------------------------------------------------------------
+
+/** Anything with the four table readers; the app's client, or a test's counting client. */
+type Reader = Pick<typeof prisma, "workOffer" | "workPeriod" | "payment" | "employerStatement">;
+
+/**
+ * Postgres accepts at most 65,535 parameters in one statement, and each id is
+ * one. Longer lists are read in chunks of this size.
+ */
+export const ID_CHUNK = 5_000;
+
+async function readByIds<T extends { id: string }>(
+  ids: Set<string>,
+  read: (chunk: string[]) => Promise<T[]>,
+): Promise<Map<string, T>> {
+  const all = [...ids];
+  const rows = new Map<string, T>();
+  for (let i = 0; i < all.length; i += ID_CHUNK) {
+    for (const r of await read(all.slice(i, i + ID_CHUNK))) rows.set(r.id, r);
+  }
+  return rows;
+}
+
+/** CONFIRM and DISPUTE ids are "WORK:<id>" or "PAYMENT:<id>". Split on the first colon. */
+function splitTarget(recordId: string): { table: string; id: string } | null {
+  const sep = recordId.indexOf(":");
+  return sep === -1 ? null : { table: recordId.slice(0, sep), id: recordId.slice(sep + 1) };
+}
+
+/**
+ * The sealed text of each record, rebuilt from the live rows, in the order
+ * given. null where the row is gone or the record cannot exist yet, which the
+ * check reports as RECORD_MISSING.
+ */
+export async function rebuildPayloads(
+  entries: { recordType: string; recordId: string }[],
+  db: Reader = prisma,
+): Promise<(string | null)[]> {
+  // 1. Which rows each table must give us.
+  const offerIds = new Set<string>();
+  const workIds = new Set<string>();
+  const paymentIds = new Set<string>();
+  const statementIds = new Set<string>();
+
+  for (const { recordType, recordId } of entries) {
+    if (recordType === "OFFER" || recordType === "ACCEPT") offerIds.add(recordId);
+    else if (recordType === "WORK") workIds.add(recordId);
+    else if (recordType === "PAYMENT") paymentIds.add(recordId);
+    else if (recordType === "EMPLOYER_NOTE") statementIds.add(recordId);
+    else if (recordType === "CONFIRM" || recordType === "DISPUTE") {
+      const t = splitTarget(recordId);
+      if (t?.table === "WORK") workIds.add(t.id);
+      else if (t?.table === "PAYMENT") paymentIds.add(t.id);
+    }
   }
 
-  if (recordType === "ACCEPT") {
-    // The ACCEPT record's id is the offer's id: one acceptance per offer.
-    const o = await prisma.workOffer.findUnique({ where: { id: recordId } });
-    if (!o || !o.respondedAt) return null;
-    return canonicalPayload({
-      type: "ACCEPT",
-      offerId: o.id,
-      workerId: o.workerId,
-      dailyRate: o.dailyRate,
-      workType: o.workType,
-      siteName: o.siteName,
-      acceptedAt: o.respondedAt.toISOString(),
-      via: o.respondedVia ?? "",
-    });
-  }
+  // 2. One query per table (more only past ID_CHUNK ids), none for an unused table.
+  const withWorker = { offer: { select: { workerId: true } } } as const;
+  const [offers, works, payments, statements] = await Promise.all([
+    readByIds(offerIds, (id) => db.workOffer.findMany({ where: { id: { in: id } } })),
+    readByIds(workIds, (id) => db.workPeriod.findMany({ where: { id: { in: id } }, include: withWorker })),
+    readByIds(paymentIds, (id) => db.payment.findMany({ where: { id: { in: id } }, include: withWorker })),
+    readByIds(statementIds, (id) => db.employerStatement.findMany({ where: { id: { in: id } } })),
+  ]);
 
-  if (recordType === "WORK") {
-    const w = await prisma.workPeriod.findUnique({
-      where: { id: recordId },
-      include: { offer: { select: { workerId: true } } },
-    });
-    if (!w) return null;
-    return canonicalPayload({
-      type: "WORK",
-      offerId: w.offerId,
-      workerId: w.offer.workerId,
-      fromDate: w.fromDate.toISOString(),
-      toDate: w.toDate.toISOString(),
-      days: w.days,
-      note: w.note ?? "",
-    });
-  }
-
-  if (recordType === "PAYMENT") {
-    const p = await prisma.payment.findUnique({
-      where: { id: recordId },
-      include: { offer: { select: { workerId: true } } },
-    });
-    if (!p) return null;
-    return canonicalPayload({
-      type: "PAYMENT",
-      offerId: p.offerId,
-      workerId: p.offer.workerId,
-      amount: p.amount,
-      paidOn: p.paidOn.toISOString(),
-      method: p.method,
-      note: p.note ?? "",
-    });
-  }
-
-  // CONFIRM and DISPUTE records use a composite id, "WORK:<id>" or
-  // "PAYMENT:<id>", because they refer to a row in one of two different tables.
-  // Splitting on the first colon tells us where to look.
-  if (recordType === "CONFIRM" || recordType === "DISPUTE") {
-    const sep = recordId.indexOf(":");
-    if (sep === -1) return null;
-    const targetType = recordId.slice(0, sep);
-    const targetId = recordId.slice(sep + 1);
-
-    if (targetType === "WORK") {
-      const w = await prisma.workPeriod.findUnique({
-        where: { id: targetId },
-        include: { offer: { select: { workerId: true } } },
+  // 3. The text, field for field as it was sealed.
+  return entries.map(({ recordType, recordId }): string | null => {
+    if (recordType === "OFFER") {
+      const o = offers.get(recordId);
+      if (!o) return null;
+      return canonicalPayload({
+        type: "OFFER",
+        workerId: o.workerId,
+        contractorId: o.contractorId,
+        dailyRate: o.dailyRate,
+        workType: o.workType,
+        siteName: o.siteName,
+        startDate: o.startDate.toISOString(),
+        expectedDays: o.expectedDays,
+        extraTerms: o.extraTerms ?? "",
       });
-      if (!w || !w.confirmedAt) return null;
+    }
 
-      if (recordType === "CONFIRM") {
+    if (recordType === "ACCEPT") {
+      // The ACCEPT record's id is the offer's id: one acceptance per offer.
+      const o = offers.get(recordId);
+      if (!o || !o.respondedAt) return null;
+      return canonicalPayload({
+        type: "ACCEPT",
+        offerId: o.id,
+        workerId: o.workerId,
+        dailyRate: o.dailyRate,
+        workType: o.workType,
+        siteName: o.siteName,
+        acceptedAt: o.respondedAt.toISOString(),
+        via: o.respondedVia ?? "",
+      });
+    }
+
+    if (recordType === "WORK") {
+      const w = works.get(recordId);
+      if (!w) return null;
+      return canonicalPayload({
+        type: "WORK",
+        offerId: w.offerId,
+        workerId: w.offer.workerId,
+        fromDate: w.fromDate.toISOString(),
+        toDate: w.toDate.toISOString(),
+        days: w.days,
+        note: w.note ?? "",
+      });
+    }
+
+    if (recordType === "PAYMENT") {
+      const p = payments.get(recordId);
+      if (!p) return null;
+      return canonicalPayload({
+        type: "PAYMENT",
+        offerId: p.offerId,
+        workerId: p.offer.workerId,
+        amount: p.amount,
+        paidOn: p.paidOn.toISOString(),
+        method: p.method,
+        note: p.note ?? "",
+      });
+    }
+
+    // CONFIRM and DISPUTE refer to a row in one of two tables, named in the id.
+    if (recordType === "CONFIRM" || recordType === "DISPUTE") {
+      const t = splitTarget(recordId);
+      if (!t) return null;
+
+      if (t.table === "WORK") {
+        const w = works.get(t.id);
+        if (!w || !w.confirmedAt) return null;
+        if (recordType === "CONFIRM") {
+          return canonicalPayload({
+            type: "CONFIRM",
+            targetType: "WORK",
+            targetId: t.id,
+            workerId: w.offer.workerId,
+            value: w.days,
+            confirmedAt: w.confirmedAt.toISOString(),
+            via: w.confirmedVia ?? "",
+          });
+        }
         return canonicalPayload({
-          type: "CONFIRM",
+          type: "DISPUTE",
           targetType: "WORK",
-          targetId,
+          targetId: t.id,
           workerId: w.offer.workerId,
-          value: w.days,
-          confirmedAt: w.confirmedAt.toISOString(),
+          contractorValue: w.days,
+          workerValue: w.workerClaimsDays ?? 0,
+          note: w.disputeNote ?? "",
+          disputedAt: w.confirmedAt.toISOString(),
           via: w.confirmedVia ?? "",
         });
       }
 
-      return canonicalPayload({
-        type: "DISPUTE",
-        targetType: "WORK",
-        targetId,
-        workerId: w.offer.workerId,
-        contractorValue: w.days,
-        workerValue: w.workerClaimsDays ?? 0,
-        note: w.disputeNote ?? "",
-        disputedAt: w.confirmedAt.toISOString(),
-        via: w.confirmedVia ?? "",
-      });
-    }
-
-    if (targetType === "PAYMENT") {
-      const p = await prisma.payment.findUnique({
-        where: { id: targetId },
-        include: { offer: { select: { workerId: true } } },
-      });
-      if (!p || !p.confirmedAt) return null;
-
-      if (recordType === "CONFIRM") {
+      if (t.table === "PAYMENT") {
+        const p = payments.get(t.id);
+        if (!p || !p.confirmedAt) return null;
+        if (recordType === "CONFIRM") {
+          return canonicalPayload({
+            type: "CONFIRM",
+            targetType: "PAYMENT",
+            targetId: t.id,
+            workerId: p.offer.workerId,
+            value: p.amount,
+            confirmedAt: p.confirmedAt.toISOString(),
+            via: p.confirmedVia ?? "",
+          });
+        }
         return canonicalPayload({
-          type: "CONFIRM",
+          type: "DISPUTE",
           targetType: "PAYMENT",
-          targetId,
+          targetId: t.id,
           workerId: p.offer.workerId,
-          value: p.amount,
-          confirmedAt: p.confirmedAt.toISOString(),
+          contractorValue: p.amount,
+          workerValue: p.workerClaimsAmount ?? 0,
+          note: p.disputeNote ?? "",
+          disputedAt: p.confirmedAt.toISOString(),
           via: p.confirmedVia ?? "",
         });
       }
 
+      return null;
+    }
+
+    // The contractor's answer to a rejected record. Its recordId is the
+    // statement row's own id; the target it answers is stored on that row.
+    if (recordType === "EMPLOYER_NOTE") {
+      const s = statements.get(recordId);
+      if (!s) return null;
       return canonicalPayload({
-        type: "DISPUTE",
-        targetType: "PAYMENT",
-        targetId,
-        workerId: p.offer.workerId,
-        contractorValue: p.amount,
-        workerValue: p.workerClaimsAmount ?? 0,
-        note: p.disputeNote ?? "",
-        disputedAt: p.confirmedAt.toISOString(),
-        via: p.confirmedVia ?? "",
+        type: "EMPLOYER_NOTE",
+        targetType: s.targetType,
+        targetId: s.targetId,
+        contractorId: s.contractorId,
+        note: s.note,
+        writtenAt: s.createdAt.toISOString(),
       });
     }
 
     return null;
-  }
-
-  // The contractor's answer to a rejected record. Its recordId is the statement
-  // row's own id, not a composite, because one EmployerStatement row is the whole
-  // record: the target it answers is stored on that row.
-  if (recordType === "EMPLOYER_NOTE") {
-    const s = await prisma.employerStatement.findUnique({ where: { id: recordId } });
-    if (!s) return null;
-    return canonicalPayload({
-      type: "EMPLOYER_NOTE",
-      targetType: s.targetType,
-      targetId: s.targetId,
-      contractorId: s.contractorId,
-      note: s.note,
-      writtenAt: s.createdAt.toISOString(),
-    });
-  }
-
-  return null;
+  });
 }
 
-/**
- * Rebuild and check the whole chain.
- *
- * Ordered by chainIndex, never by timestamp: chainIndex is unique and defines the
- * canonical order, so the check is deterministic even when two records share a
- * creation time.
- */
 /**
  * The Merkle tree's leaves (ADR-0017): the 32 bytes of each row's stored
  * currentHash, in chainIndex order. Read only; nothing here rebuilds or hashes a
@@ -275,8 +334,19 @@ export async function ledgerLeaves(): Promise<Buffer[]> {
   return rows.map((r) => Buffer.from(r.currentHash, "hex"));
 }
 
-export async function verifyLedger(): Promise<VerificationResult> {
-  const links = await prisma.ledgerEntry.findMany({
+/**
+ * Rebuild and check the whole chain.
+ *
+ * Ordered by chainIndex, never by timestamp: chainIndex is unique and defines the
+ * canonical order, so the check is deterministic even when two records share a
+ * creation time.
+ *
+ * `db` is only for tests, which pass a client that counts queries.
+ */
+export async function verifyLedger(
+  db: Reader & Pick<typeof prisma, "ledgerEntry"> = prisma,
+): Promise<VerificationResult> {
+  const links = await db.ledgerEntry.findMany({
     orderBy: { chainIndex: "asc" },
     select: {
       id: true,
@@ -290,12 +360,8 @@ export async function verifyLedger(): Promise<VerificationResult> {
     },
   });
 
-  const withCurrent: StoredLink[] = await Promise.all(
-    links.map(async (link) => ({
-      ...link,
-      currentPayload: await rebuildPayload(link.recordType, link.recordId),
-    })),
-  );
+  const current = await rebuildPayloads(links, db);
+  const withCurrent: StoredLink[] = links.map((link, i) => ({ ...link, currentPayload: current[i] ?? null }));
 
   return verifyChain(withCurrent);
 }

@@ -1,11 +1,12 @@
-date: 2026-09-29T07:10:37.636Z
+date: 2026-09-29T09:52:52.026Z
 cpu: AMD Ryzen 5 5500U with Radeon Graphics (12 threads)
 memory: 15.0 GiB
 node: v24.13.0
 postgres: PostgreSQL 16.4 (Debian 16.4-1.pgdg110+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
 sizes: 1000, 5000, 10000, 20000, 100000
 runs: 5 after 1 warm-up (chain_per_row: at most 3 from 10000 rows; merkle_proof_check: 1000)
-chain_per_row: measured only up to 20000 rows; at 100000 one run did not finish in 18 minutes
+chain_per_row: the pre-29-Sep check (one rebuildPayload per row), measured only up to 20000 rows; at 100000 one run of the original did not finish in 18 minutes
+chain_batched: verifyLedger() as the app runs it now (one query per table)
 data: one contract, n PAYMENT rows, each sealed with HMAC-SHA-256 (benchmark key)
 total_ms: median wall-clock time in the benchmark process; database in Docker on the same machine
 proof_bytes: number of hashes in the inclusion proof x 32

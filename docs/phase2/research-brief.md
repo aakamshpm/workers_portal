@@ -133,12 +133,12 @@ The core developer's tamper simulation checks this table. Use the real `tamper.c
 - **Measured:** time for full verification (current), time for full verification with batched reads, time to create and check one inclusion proof, and proof size in bytes.
 - **Result files (ready now):** in `docs/research/results/`.
   - `verify_bench.csv`: `rows, method, total_ms, proof_bytes, runs`. The methods are:
-    - `chain_per_row`: today's check, which runs one query per row.
-    - `chain_batched`: the same check with one query for all rows.
+    - `chain_per_row`: the check as it was before 29 September, which runs one query per row.
+    - `chain_batched`: the check the app uses now, with one query per table.
     - `merkle_root`: computing the root.
     - `merkle_proof_build`: the server making one proof.
     - `merkle_proof_check`: the worker's phone checking it.
-  - `chain_per_row` stops at 20,000 rows. One run at 1,00,000 rows did not finish in 18 minutes, and that is a result in itself.
+  - `chain_per_row` stops at 20,000 rows. One run at 1,00,000 rows did not finish in 18 minutes, and that is a result in itself: it is why the app now uses `chain_batched`.
   - `verify_env.txt`: the machine and the settings of the run.
   - `tamper.csv`: `attack, method, detected, row_found, target_row, first_reported`. The simulation uses 100 rows, and each attack is aimed at row 50 (for `delete_last_row`, row 99).
   - To run them again: `npm --prefix server run bench:verify` (about 4 minutes) and `npm --prefix server run tamper` (1 second).

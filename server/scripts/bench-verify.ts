@@ -19,13 +19,16 @@ import { benchTargetAllowed, percentile } from "./bench-lib";
  * applies the real migrations, and fills it with one contract and n sealed
  * payments. Then it times, at each size:
  *
- *   chain_per_row       verifyLedger() exactly as the app runs it: every row is
- *                       rebuilt from its live table row, one query per row.
- *                       Only up to --per-row-max rows (default 20000), because
- *                       its time grows faster than the row count.
- *   chain_batched       the same check with the live rows read in one query and
- *                       rebuilt in memory. Payments only, since the data has only
- *                       payments. Benchmark only; the app does not use it yet.
+ *   chain_per_row       the check as the app ran it before 29 Sep 2026: every
+ *                       row rebuilt with rebuildPayload(), one query per row,
+ *                       all at once. rebuildPayload() now reads with findMany
+ *                       where it used findUnique, which Prisma had batched, so
+ *                       this is slower at 1,000 rows than the old app (90 ms
+ *                       then). Only up to --per-row-max rows (default
+ *                       20000), because its time grows faster than the row count.
+ *   chain_batched       verifyLedger() as the app runs it now: the live rows
+ *                       read with one query per table (rebuildPayloads), then
+ *                       rebuilt in memory.
  *   merkle_root         read the leaves (ledgerLeaves) and compute the root.
  *   merkle_proof_build  read the leaves and build one inclusion proof (server).
  *   merkle_proof_check  check that proof against the root (worker's phone).
@@ -48,7 +51,7 @@ function arg(name: string): string | undefined {
 }
 
 const SIZES = (arg("sizes") ?? "1000,5000,10000,20000,100000").split(",").map(Number);
-// verifyLedger() starts one query per row at once, and its time grows faster
+// The old per-row check starts one query per row at once, and its time grows faster
 // than the row count (1k: ~0.1 s, 10k: ~2.5 s). At 100k one run did not finish
 // in 18 minutes, so it is only measured up to this size.
 const PER_ROW_MAX = Number(arg("per-row-max") ?? 20000);
@@ -110,7 +113,7 @@ async function main() {
   await recreateDatabase();
 
   const { prisma } = await import("../src/lib/prisma");
-  const { verifyLedger, ledgerLeaves } = await import("../src/lib/ledger");
+  const { verifyLedger, ledgerLeaves, rebuildPayload } = await import("../src/lib/ledger");
   const { GENESIS_HASH, canonicalPayload, computeHash, verifyChain } = await import("../src/lib/hashChain");
   const { merkleRoot, inclusionProof, verifyInclusion, leafHash } = await import("../src/lib/merkle");
 
@@ -181,29 +184,20 @@ async function main() {
     return prev;
   }
 
-  /** chain_batched: the same links verifyLedger() builds, with one query for the live rows. */
-  async function verifyBatched() {
+  /** chain_per_row: the old verifyLedger(), kept here only to measure it. */
+  async function verifyPerRow() {
     const links = await prisma.ledgerEntry.findMany({
       orderBy: { chainIndex: "asc" },
       select: { id: true, chainIndex: true, recordType: true, recordId: true, summary: true, payload: true, previousHash: true, currentHash: true },
     });
-    const payments = await prisma.payment.findMany({ include: { offer: { select: { workerId: true } } } });
-    const live = new Map(
-      payments.map((p) => [
-        p.id,
-        canonicalPayload({
-          type: "PAYMENT",
-          offerId: p.offerId,
-          workerId: p.offer.workerId,
-          amount: p.amount,
-          paidOn: p.paidOn.toISOString(),
-          method: p.method,
-          note: p.note ?? "",
-        }),
-      ]),
+    const withCurrent = await Promise.all(
+      links.map(async (l) => ({ ...l, currentPayload: await rebuildPayload(l.recordType, l.recordId) })),
     );
-    return verifyChain(links.map((l) => ({ ...l, currentPayload: live.get(l.recordId) ?? null })));
+    return verifyChain(withCurrent);
   }
+
+  /** chain_batched: the app's verifyLedger(). */
+  const verifyBatched = () => verifyLedger();
 
   const summaryOf = (r: { valid: boolean; failures: { chainIndex: number; problem: string }[] }) =>
     `${r.valid}:${r.failures.map((f) => `${f.chainIndex}:${f.problem}`).join(",")}`;
@@ -233,7 +227,7 @@ async function main() {
     const batched = await time(() => verifyBatched(), RUNS);
     if (!batched.last.valid) throw new Error(`untouched ledger: batched says ${summaryOf(batched.last)}`);
     const perRowRuns = size >= 10_000 ? Math.min(RUNS, 3) : RUNS;
-    const perRow = size <= PER_ROW_MAX ? await time(() => verifyLedger(), perRowRuns) : null;
+    const perRow = size <= PER_ROW_MAX ? await time(() => verifyPerRow(), perRowRuns) : null;
     if (perRow && summaryOf(perRow.last) !== summaryOf(batched.last)) {
       throw new Error(`untouched ledger: per_row ${summaryOf(perRow.last)} vs batched ${summaryOf(batched.last)}`);
     }
@@ -270,7 +264,7 @@ async function main() {
   }
   const edited = `p${Math.floor(have / 3)}`;
   await db.query(`UPDATE "Payment" SET amount = 1 WHERE id = $1`, [edited]);
-  const [a, b] = [await verifyLedger(), await verifyBatched()];
+  const [a, b] = [await verifyPerRow(), await verifyBatched()];
   await db.query(`UPDATE "Payment" SET amount = 1000 + $2 WHERE id = $1`, [edited, Math.floor(have / 3)]);
   if (a.valid || summaryOf(a) !== summaryOf(b)) {
     throw new Error(`edited ledger: per_row ${summaryOf(a)} vs batched ${summaryOf(b)}`);
@@ -291,7 +285,8 @@ async function main() {
       `postgres: ${version.v}`,
       `sizes: ${SIZES.join(", ")}`,
       `runs: ${RUNS} after 1 warm-up (chain_per_row: at most 3 from 10000 rows; merkle_proof_check: ${Math.max(RUNS, 1000)})`,
-      `chain_per_row: measured only up to ${PER_ROW_MAX} rows; at 100000 one run did not finish in 18 minutes`,
+      `chain_per_row: the pre-29-Sep check (one rebuildPayload per row), measured only up to ${PER_ROW_MAX} rows; at 100000 one run of the original did not finish in 18 minutes`,
+      `chain_batched: verifyLedger() as the app runs it now (one query per table)`,
       `data: one contract, n PAYMENT rows, each sealed with HMAC-SHA-256 (benchmark key)`,
       `total_ms: median wall-clock time in the benchmark process; database in Docker on the same machine`,
       `proof_bytes: number of hashes in the inclusion proof x 32`,
