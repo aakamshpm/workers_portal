@@ -171,6 +171,7 @@ Check each reference yourself before you cite it. AI tools sometimes invent pape
 
 - Why not use ML for search? Search here is exact geometry, not a prediction. An index gives the exact answer quickly, and a model would only give an approximate one.
 - Why not a blockchain? See B3 point 6.
-- What if the secret key leaks? The published root still catches a rewrite of old rows. We would then change the key and publish a new root.
+- What if the secret key leaks? In the design, a root published earlier still catches a rewrite of old rows (see `tamper.csv`). Say clearly that this was shown in the simulation: the running app does not publish a root, so today it would not catch this rewrite.
+- Can a worker check his own record in the app? Not in the app. The experiment shows it is possible with a proof of about 544 bytes at 1,00,000 rows, checked in 0.025 ms.
 - Why GiST and not B-tree? A B-tree orders one value on a line. Location has two dimensions, and "within a radius" is not a range on one column.
 - Does the index slow down writes? A little, because each new or moved location also updates the index. People register and move far less often than they search, so the trade-off is worth it.
