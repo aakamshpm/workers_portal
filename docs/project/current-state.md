@@ -14,6 +14,7 @@ What the running code does today.
 - Complaints: six statuses, four decide outcomes, escalate to Labour Commissioner or Police.
 - Hash chain with HMAC-SHA-256 (`HMAC_SECRET`), seven types: OFFER, ACCEPT, WORK, PAYMENT, CONFIRM, DISPUTE, EMPLOYER_NOTE. Missing key fails startup.
 - `rebuildPayload()` reads the live table row before hashing. Do not hash `LedgerEntry.payload` to verify a row.
+- Merkle tree over the ledger (ADR-0017), `server/src/lib/merkle.ts`: RFC 6962 root, inclusion proof and consistency proof, checked against the published RFC 6962 test vectors. Leaves are the stored `currentHash` values (`ledgerLeaves()` in `ledger.ts`). No route and no published root yet. Benchmark `npm --prefix server run bench:verify` and tamper simulation `npm --prefix server run tamper` write to `docs/research/results/`.
 - Postgres + PostGIS in Docker. `User` has opt-in `looking`, `latitude`, `longitude`, `preferredWorkType`. `Place` holds public business listings (not jobs).
 - `SmsProvider` calls Textbee (`POST /gateway/send-sms`). Tests use a fake, never `api.textbee.dev`. `send()` fails when `TEXTBEE_API_KEY` is missing and writes no row. Inbound is a 30s poll (`src/lib/inbound.ts`) that stores each reply, deduped on the Textbee message id, and applies it through the same `respondToOffer` / `respondToRecord` the website uses. Checked on a real handset: offer SMS received, `YES` reply accepted the offer.
 - Tests run against `wage_test` (`test/setup.ts`), never the development ledger.

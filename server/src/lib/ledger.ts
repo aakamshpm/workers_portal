@@ -262,6 +262,19 @@ export async function rebuildPayload(
  * canonical order, so the check is deterministic even when two records share a
  * creation time.
  */
+/**
+ * The Merkle tree's leaves (ADR-0017): the 32 bytes of each row's stored
+ * currentHash, in chainIndex order. Read only; nothing here rebuilds or hashes a
+ * payload, so it does not replace verifyLedger(), which checks the live rows.
+ */
+export async function ledgerLeaves(): Promise<Buffer[]> {
+  const rows = await prisma.ledgerEntry.findMany({
+    orderBy: { chainIndex: "asc" },
+    select: { currentHash: true },
+  });
+  return rows.map((r) => Buffer.from(r.currentHash, "hex"));
+}
+
 export async function verifyLedger(): Promise<VerificationResult> {
   const links = await prisma.ledgerEntry.findMany({
     orderBy: { chainIndex: "asc" },

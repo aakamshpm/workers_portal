@@ -120,6 +120,7 @@ The core developer builds both and runs the benchmarks. You explain **what, why 
 | Delete a ledger row | detected | detected | detected |
 | Insert a fake row | detected | detected | detected |
 | Reorder rows | detected | detected | detected |
+| Delete the **last** row | not detected | not detected | **detected** (root does not match) |
 | Rewrite the whole chain **without** the key | not detected | detected | detected |
 | Rewrite the whole chain **with** the key | not detected | not detected | **detected** (root does not match) |
 | Worker checks only his own record | no | no | **yes, about log₂ n hashes** |
@@ -128,11 +129,19 @@ The core developer's tamper simulation checks this table. Use the real `tamper.c
 
 ### B5. Experiment (the core developer runs it, you present it)
 
-- **Ledger sizes:** 1,000 / 10,000 / 1,00,000 rows.
+- **Ledger sizes:** 1,000 / 5,000 / 10,000 / 20,000 / 1,00,000 rows.
 - **Measured:** time for full verification (current), time for full verification with batched reads, time to create and check one inclusion proof, and proof size in bytes.
-- **Result files:**
-  - `verify_bench.csv` with the columns `rows, method, total_ms, proof_bytes`.
-  - `tamper.csv` with the columns `attack, method, detected, row_found`.
+- **Result files (ready now):** in `docs/research/results/`.
+  - `verify_bench.csv`: `rows, method, total_ms, proof_bytes, runs`. The methods are:
+    - `chain_per_row`: today's check, which runs one query per row.
+    - `chain_batched`: the same check with one query for all rows.
+    - `merkle_root`: computing the root.
+    - `merkle_proof_build`: the server making one proof.
+    - `merkle_proof_check`: the worker's phone checking it.
+  - `chain_per_row` stops at 20,000 rows. One run at 1,00,000 rows did not finish in 18 minutes, and that is a result in itself.
+  - `verify_env.txt`: the machine and the settings of the run.
+  - `tamper.csv`: `attack, method, detected, row_found, target_row, first_reported`. The simulation uses 100 rows, and each attack is aimed at row 50 (for `delete_last_row`, row 99).
+  - To run them again: `npm --prefix server run bench:verify` (about 4 minutes) and `npm --prefix server run tamper` (1 second).
 - **Graphs to prepare now:**
   1. verification time against rows, one line per method, log scale;
   2. proof size against rows, which should grow like log₂ n;
