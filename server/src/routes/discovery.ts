@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../lib/auth";
 import { nearestPlace, searchPlaces } from "../lib/places";
+import { nearbyPlacesSql, nearbyUsersSql } from "../lib/nearby";
 
 export const discoveryRouter = Router();
 
@@ -160,41 +161,11 @@ discoveryRouter.get("/nearby-work", requireRole("WORKER"), async (req, res) => {
   const { lat, lng, radiusKm } = parsed.data;
   const radiusM = Math.round(radiusKm * 1000);
 
-  const contractors = (await prisma.$queryRaw`
-    SELECT id, name, phone, company, "preferredWorkType",
-      ST_Distance(
-        ST_MakePoint(longitude, latitude)::geography,
-        ST_MakePoint(${lng}, ${lat})::geography
-      ) / 1000.0 AS "distanceKm"
-    FROM "User"
-    WHERE role = 'CONTRACTOR'
-      AND looking = true
-      AND latitude IS NOT NULL
-      AND longitude IS NOT NULL
-      AND ST_DWithin(
-        ST_MakePoint(longitude, latitude)::geography,
-        ST_MakePoint(${lng}, ${lat})::geography,
-        ${radiusM}
-      )
-    ORDER BY ST_MakePoint(longitude, latitude)::geography <-> ST_MakePoint(${lng}, ${lat})::geography
-    LIMIT 50
-  `) as ContractorRow[];
-
-  const businesses = (await prisma.$queryRaw`
-    SELECT id, name, category, phone, source,
-      ST_Distance(
-        ST_MakePoint(longitude, latitude)::geography,
-        ST_MakePoint(${lng}, ${lat})::geography
-      ) / 1000.0 AS "distanceKm"
-    FROM "Place"
-    WHERE ST_DWithin(
-        ST_MakePoint(longitude, latitude)::geography,
-        ST_MakePoint(${lng}, ${lat})::geography,
-        ${radiusM}
-      )
-    ORDER BY ST_MakePoint(longitude, latitude)::geography <-> ST_MakePoint(${lng}, ${lat})::geography
-    LIMIT 50
-  `) as PlaceRow[];
+  // Both searches use the GiST indexes (ADR-0016). The SQL is in lib/nearby.ts.
+  const contractors = (await prisma.$queryRaw(
+    nearbyUsersSql({ role: "CONTRACTOR", lat, lng, radiusM }),
+  )) as ContractorRow[];
+  const businesses = (await prisma.$queryRaw(nearbyPlacesSql({ lat, lng, radiusM }))) as PlaceRow[];
 
   return res.json({
     contractors: contractors.map((c) => ({
@@ -235,46 +206,9 @@ discoveryRouter.get("/nearby-workers", requireRole("CONTRACTOR"), async (req, re
   const { lat, lng, radiusKm, workType } = parsed.data;
   const radiusM = Math.round(radiusKm * 1000);
 
-  const workers = workType
-    ? ((await prisma.$queryRaw`
-        SELECT id, name, phone, "homeState", "preferredWorkType",
-          ST_Distance(
-            ST_MakePoint(longitude, latitude)::geography,
-            ST_MakePoint(${lng}, ${lat})::geography
-          ) / 1000.0 AS "distanceKm"
-        FROM "User"
-        WHERE role = 'WORKER'
-          AND looking = true
-          AND latitude IS NOT NULL
-          AND longitude IS NOT NULL
-          AND "preferredWorkType" ILIKE ${`%${workType}%`}
-          AND ST_DWithin(
-            ST_MakePoint(longitude, latitude)::geography,
-            ST_MakePoint(${lng}, ${lat})::geography,
-            ${radiusM}
-          )
-        ORDER BY ST_MakePoint(longitude, latitude)::geography <-> ST_MakePoint(${lng}, ${lat})::geography
-        LIMIT 50
-      `) as WorkerRow[])
-    : ((await prisma.$queryRaw`
-        SELECT id, name, phone, "homeState", "preferredWorkType",
-          ST_Distance(
-            ST_MakePoint(longitude, latitude)::geography,
-            ST_MakePoint(${lng}, ${lat})::geography
-          ) / 1000.0 AS "distanceKm"
-        FROM "User"
-        WHERE role = 'WORKER'
-          AND looking = true
-          AND latitude IS NOT NULL
-          AND longitude IS NOT NULL
-          AND ST_DWithin(
-            ST_MakePoint(longitude, latitude)::geography,
-            ST_MakePoint(${lng}, ${lat})::geography,
-            ${radiusM}
-          )
-        ORDER BY ST_MakePoint(longitude, latitude)::geography <-> ST_MakePoint(${lng}, ${lat})::geography
-        LIMIT 50
-      `) as WorkerRow[]);
+  const workers = (await prisma.$queryRaw(
+    nearbyUsersSql({ role: "WORKER", lat, lng, radiusM, workType }),
+  )) as WorkerRow[];
 
   return res.json({
     workers: workers.map((w) => ({

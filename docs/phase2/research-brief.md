@@ -66,7 +66,11 @@ The core developer builds both and runs the benchmarks. You explain **what, why 
   2. PostGIS `ST_DWithin` with no index (today),
   3. PostGIS `ST_DWithin` with the GiST index.
 - **Measured:** median and 95th-percentile query time (`EXPLAIN ANALYZE`), index size, and index build time.
-- **Result file:** `search_bench.csv` with the columns `users, method, p50_ms, p95_ms`.
+- **Result files (ready now):** in `docs/research/results/`.
+  - `search_bench.csv`: `users, method, p50_ms, p95_ms, mean_ms, avg_results`. The methods are `haversine_app`, `postgis_scan` and `postgis_gist`.
+  - `search_index.csv`: `users, index_bytes, table_bytes, build_ms`.
+  - `search_env.txt`: the machine, the versions and the settings of the run. Use it for section 4, "Experimental setup".
+  - To run it again: `npm --prefix server run bench:search`. It takes about 2 minutes.
 - **Graph to prepare now, with placeholder values:** a line chart with users on the x axis (log scale) and time in ms on the y axis, one line per method.
 - **Expected shape:** methods 1 and 2 grow in a straight line with n, and method 3 stays almost flat. Write the text so it still makes sense if the real numbers are a little different.
 

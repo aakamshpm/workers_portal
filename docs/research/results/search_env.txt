@@ -1,0 +1,14 @@
+date: 2026-09-28T14:52:58.225Z
+cpu: AMD Ryzen 5 5500U with Radeon Graphics (12 threads)
+memory: 15.0 GiB
+node: v24.13.0
+postgres: PostgreSQL 16.4 (Debian 16.4-1.pgdg110+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+postgis: 3.4.3
+shared_buffers: 163848kB
+work_mem: 4096kB
+sizes: 1000, 10000, 100000, 1000000
+queries per method and size: 30 (after 3 warm-up)
+radius: 25 km, limit 50, role WORKER, opted in only
+data: users near the 14 district towns, up to ~15 km away; 1 in 10 contractors; 4 in 5 opted in; seed 20260930
+index: CREATE INDEX "User_location_gist" ON public."User" USING gist (((st_makepoint(longitude, latitude))::geography)) WHERE ((looking = true) AND (latitude IS NOT NULL))
+timing: wall clock in the benchmark process around each query; database in Docker on the same machine
