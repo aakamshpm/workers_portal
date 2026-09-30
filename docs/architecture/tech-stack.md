@@ -7,6 +7,7 @@ Locked. Change only with a new ADR.
 | Language | TypeScript | 0001 |
 | API | Express on Node | 0001 |
 | Web | React + Vite, three apps from one project | 0001, 0012 |
+| Design system | Tailwind 4 `@theme` tokens + shared components, from the Stitch design | 0019 |
 | Database | PostgreSQL + PostGIS | 0002 |
 | ORM | Prisma | 0002 |
 | Integrity | Hash chain + HMAC | 0003, 0004 |

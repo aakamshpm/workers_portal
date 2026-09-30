@@ -37,6 +37,8 @@ Stitch follows your words literally. Give it one screen per prompt, with the exa
 
 ## Design tokens (use these exact values)
 
+> **Superseded by the built design system (ADR-0019).** The table below is what the designer was asked for. The finished Stitch design carries a fuller Material 3 palette grown from the same seed colour `#0F766E`, and that palette is now the source of truth, in `client/src/shared/theme.css`. Two differences matter when reading the screens: the design's `primary` is the darker `#005c55` (icons, links, active text) and `#0F766E` is its `primary-container` (filled buttons); its page background is `#f8f9ff` and its card radius is 12px.
+
 | Token | Value | Use |
 |---|---|---|
 | Primary | `#0F766E` (teal 700) | main buttons, active tab |
@@ -98,7 +100,7 @@ Make **W1 in Bengali as well**, so the design is checked with real Indian script
 | C2 | Offer work form | worker's phone number, pay for one day (₹), expected days, type of work, work site, start date, anything else promised. Note: "The worker gets this on his phone and must accept it. After he accepts, the rate cannot be changed." |
 | C3 | Write down work done | **first a small balance table** (rate, days so far, earned, paid, owed), then from date, to date, days, note |
 | C4 | Pay a worker | choose a worker, then 3 large choice cards: **"Worker reads a code"** (recommended), **"UPI / bank"**, **"Cash, no proof"** (with a warning that this is weakest) |
-| C5 | Code payment | amount, "Send code to worker", then "Ask the worker for the code. It is on his phone.", 6 boxes, a 15-minute countdown. The code is **never shown** on this screen |
+| C5 | Code payment | amount, "Send code to worker", then "Ask the worker for the code. It is on his phone.", **4 boxes** (`generateHandoverCode` makes a 4-digit code), a 15-minute countdown. The code is **never shown** on this screen |
 | C6 | UPI / bank payment | amount, method, transaction number, date |
 | C7 | Payments already recorded | a list with proof badges: Bank has a record / Code used when paid / Worker agreed later / Nothing to show / Worker says he got nothing |
 | C8 | Records | same as W7 |
