@@ -7,6 +7,7 @@ export const bn: Messages = {
   appTagline: "কত মজুরি দেওয়ার কথা, কত দিন কাজ করেছেন, আর কত টাকা পেয়েছেন",
   language: "ভাষা",
   signOut: "সাইন আউট",
+  installApp: "অ্যাপ ইনস্টল করুন",
   roleWorker: "শ্রমিক",
   sections: "মেনু",
   tabMyWork: "আমার কাজ",

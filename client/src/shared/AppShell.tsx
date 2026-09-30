@@ -5,6 +5,7 @@ import { SIGN_IN, appFor } from "./apps";
 import { leaveTo } from "./leave";
 import type { AuthUser, Role } from "./types";
 import { LanguagePicker, useT } from "./i18n";
+import { install, useCanInstall } from "./install";
 
 const ROLE_LABEL: Record<Role, string> = {
   CONTRACTOR: "Contractor",
@@ -51,6 +52,10 @@ export function useAppSession(role: Role): AuthUser | null {
 export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
   // English unless the app mounts an I18nProvider. Only the worker app does (ADR-0015).
   const { t } = useT();
+  // After the browser offers to install (ADR-0018). The officer app never
+  // listens and has no manifest, and the role check keeps the button out of
+  // it even if an offer were ever kept, since this header is shared.
+  const canInstall = useCanInstall() && user.role !== "AUTHORITY";
   const roleLabel = user.role === "WORKER" ? t("roleWorker") : ROLE_LABEL[user.role];
 
   function signOut() {
@@ -68,6 +73,18 @@ export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]
           </div>
 
           <div className="flex items-center gap-4">
+            {canInstall && (
+              <button
+                type="button"
+                onClick={() => void install()}
+                className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+                  <path d="M10 2a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L9 11.6V3a1 1 0 0 1 1-1ZM4 15a1 1 0 0 1 1 1v1h10v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" />
+                </svg>
+                {t("installApp")}
+              </button>
+            )}
             <LanguagePicker />
             <div className="text-right">
               <p className="text-sm font-medium text-slate-900">{user.name}</p>

@@ -24,22 +24,27 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
  * The hosted build will need the same rule on its web server.
  */
 function appPages(): Plugin {
+  const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
+    const url = req.url ?? "";
+    for (const app of APPS) {
+      const inApp = url === `/${app}` || url.startsWith(`/${app}/`);
+      // A path with a dot is a real file (a script, a style, an image).
+      const isFile = /\.[a-z0-9]+(\?|$)/i.test(url.split("?")[0]!);
+      if (inApp && !isFile) {
+        req.url = `/${app}/index.html`;
+        break;
+      }
+    }
+    next();
+  };
   return {
     name: "app-pages",
     configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const url = req.url ?? "";
-        for (const app of APPS) {
-          const inApp = url === `/${app}` || url.startsWith(`/${app}/`);
-          // A path with a dot is a real file (a script, a style, an image).
-          const isFile = /\.[a-z0-9]+(\?|$)/i.test(url.split("?")[0]!);
-          if (inApp && !isFile) {
-            req.url = `/${app}/index.html`;
-            break;
-          }
-        }
-        next();
-      });
+      server.middlewares.use(rewrite);
+    },
+    // `vite preview` serves the build, which is where the service worker runs.
+    configurePreviewServer(server) {
+      server.middlewares.use(rewrite);
     },
   };
 }

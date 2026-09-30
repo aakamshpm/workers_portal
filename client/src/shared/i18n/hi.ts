@@ -7,6 +7,7 @@ export const hi: Messages = {
   appTagline: "कितनी मज़दूरी तय हुई, कितने दिन काम किया, और कितना पैसा मिला",
   language: "भाषा",
   signOut: "लॉग आउट",
+  installApp: "ऐप इंस्टॉल करें",
   roleWorker: "मज़दूर",
   sections: "मेन्यू",
   tabMyWork: "मेरा काम",

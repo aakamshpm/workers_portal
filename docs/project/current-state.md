@@ -5,7 +5,8 @@ What the running code does today.
 ## Working
 
 - Phone + PIN sign-in, at `/`. A worker registers himself, with a phone code (see below). A contractor or labour officer cannot register; the labour office creates their accounts.
-- Three separate apps from one Vite project (ADR-0012), each opening only for its own role: `/worker/`, `/contractor/`, `/officer/`. The officer app is a website only, no manifest. Access rules for who sees which records: ADR-0013, `server/src/lib/visibility.ts`.
+- Three separate apps from one Vite project (ADR-0012), each opening only for its own role: `/worker/`, `/contractor/`, `/officer/`. The officer app is a website only, no manifest.
+- PWA (ADR-0018): the worker and contractor apps each have their own manifest, icons and service worker, scoped to their own folder. An "Install app" button appears in the header only after the browser offers to install (in the worker's language). The service worker keeps the app page and build files so the app opens offline, and never stores `/api/` responses. Registered only in the production build: try it with `npm --prefix client run build` then `npm --prefix client run preview`. Icons: `npm --prefix client run icons`. The officer app has no manifest, no service worker and no button. Access rules for who sees which records: ADR-0013, `server/src/lib/visibility.ts`.
 - Offer → accept/decline → terms locked.
 - Work periods (date range + day count). Payments. Worker OK/WRONG.
 - Handover code is one-time, 15 minutes, not returned to the contractor.
@@ -53,7 +54,7 @@ After a clean seed: 7 users, 4 offers, 9 work periods, 4 payments, 32 ledger row
 
 ## Not built yet
 
-PWA, Find Workers (contractor side), officer SMS log page. Translations not reviewed by a native speaker.
+Find Workers (contractor side), officer SMS log page. Translations not reviewed by a native speaker.
 
 ## Commands
 

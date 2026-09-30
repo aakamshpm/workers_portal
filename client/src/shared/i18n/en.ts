@@ -12,6 +12,7 @@ export const en = {
   appTagline: "The pay that was promised, the days worked, and the money paid",
   language: "Language",
   signOut: "Sign out",
+  installApp: "Install app",
   roleWorker: "Worker",
   sections: "Sections",
   tabMyWork: "My work",

@@ -20,5 +20,5 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
-  "exclude": ["src/entries.test.ts"]
+  "exclude": ["src/entries.test.ts", "src/sw.test.ts"]
 }

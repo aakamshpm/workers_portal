@@ -1,0 +1,17 @@
+{
+  "id": "/contractor/",
+  "name": "Worker Pay Record: Contractor",
+  "short_name": "Contractor",
+  "description": "Offers, work days and payments for your workers.",
+  "lang": "en",
+  "start_url": "/contractor/",
+  "scope": "/contractor/",
+  "display": "standalone",
+  "background_color": "#F1F5F9",
+  "theme_color": "#0F172A",
+  "icons": [
+    { "src": "/contractor/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/contractor/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/contractor/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

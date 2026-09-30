@@ -7,6 +7,7 @@ export const ml: Messages = {
   appTagline: "പറഞ്ഞ കൂലി, പണിയെടുത്ത ദിവസം, കിട്ടിയ പണം",
   language: "ഭാഷ",
   signOut: "സൈൻ ഔട്ട്",
+  installApp: "ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
   roleWorker: "തൊഴിലാളി",
   sections: "ഭാഗങ്ങൾ",
   tabMyWork: "എന്റെ പണി",

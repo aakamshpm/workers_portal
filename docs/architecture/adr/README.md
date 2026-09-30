@@ -21,3 +21,4 @@ One short file per decision. Next number after the last file. Skill: `write-adr`
 | [0015](0015-worker-languages.md) | Worker text in five languages, without a library |
 | [0016](0016-gist-index-nearby-search.md) | GiST index for nearby search |
 | [0017](0017-merkle-tree-over-ledger.md) | Merkle tree over the ledger |
+| [0018](0018-pwa-manifests-and-service-worker.md) | PWA manifests, service worker and install button |

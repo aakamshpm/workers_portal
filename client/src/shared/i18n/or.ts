@@ -7,6 +7,7 @@ export const or: Messages = {
   appTagline: "କେତେ ମଜୁରି କହିଥିଲେ, କେତେ ଦିନ କାମ କଲେ, ଆଉ କେତେ ଟଙ୍କା ପାଇଲେ",
   language: "ଭାଷା",
   signOut: "ସାଇନ୍ ଆଉଟ୍",
+  installApp: "ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
   roleWorker: "ଶ୍ରମିକ",
   sections: "ଭାଗ",
   tabMyWork: "ମୋ କାମ",

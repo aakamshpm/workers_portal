@@ -10,7 +10,7 @@ Locked. Change only with a new ADR.
 | Database | PostgreSQL + PostGIS | 0002 |
 | ORM | Prisma | 0002 |
 | Integrity | Hash chain + HMAC | 0003, 0004 |
-| Mobile | PWA | 0005 |
+| Mobile | PWA | 0005, 0018 |
 | SMS | Textbee hosted API + one Android SIM | 0008 |
 | Maps | Leaflet + OpenStreetMap tiles | — |
 | Page tests | Vitest + Testing Library + jsdom | 0009 |

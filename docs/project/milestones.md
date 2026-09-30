@@ -6,8 +6,8 @@ Status only. The ordered build is [`plan.md`](plan.md).
 |---|---|---|
 | Structure | Docs, ADRs, OpenCode agents and skills | Done |
 | Platform | Postgres + PostGIS, HMAC, Textbee provider, poll inbound SMS | Done |
-| Worker | Three apps, access rules, sign-in by phone code, accounts, languages, Find Work, SMS as second client | Done |
-| Contractor | PWA on contractor routes, Find Workers | Not started |
+| Worker | Three apps, access rules, sign-in by phone code, accounts, languages, Find Work, SMS as second client, PWA (ADR-0018) | Done |
+| Contractor | PWA on contractor routes, Find Workers. PWA done (ADR-0018); Find Workers not started | In progress |
 | Labour office | Website only. No install prompt, no hiring map. Accounts page done; SMS log page not started | In progress |
 | Close | Docs rewrite, deploy, webhook instead of poll | Not started |
 
