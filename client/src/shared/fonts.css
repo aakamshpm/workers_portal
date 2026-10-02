@@ -1,0 +1,111 @@
+/*
+ * Web fonts (ADR-0019).
+ *
+ * One family, Noto, across the five scripts the worker app speaks (ADR-0015):
+ * Latin for English, then Devanagari for Hindi, Bengali, Malayalam and Odia.
+ * The theme's --font-sans stack lists them side by side, and the browser picks
+ * a face for each character by its unicode-range.
+ *
+ * The files come from the pinned @fontsource-variable packages and Vite copies
+ * them into the build, so the app never fetches a font from another origin and
+ * still has every script when it opens offline (ADR-0018).
+ *
+ * Why these choices:
+ *   - Variable fonts, so one file per script covers the weights 400 to 700
+ *     that the text scale uses, instead of four files per script.
+ *   - Each Indic face carries only its own script's range, and the browser
+ *     downloads a face only when a character in its range is drawn. So the
+ *     contractor and officer apps, which are English with no language menu,
+ *     never fetch the Indic files. The sign-in page and the worker app do
+ *     fetch all four (about 420 KB), because the language menu writes each
+ *     language's name in its own script, and a worker who cannot read
+ *     English must be able to find his own.
+ *   - font-display: swap, so text appears at once in the phone's own font and
+ *     changes when the file arrives. The alternative hides text for up to three
+ *     seconds, which on a slow connection is a blank wage screen.
+ *   - The Indic packages also ship Latin files. They are left out, because
+ *     Noto Sans already draws Latin and two Latin faces would be downloaded
+ *     for nothing.
+ *
+ * Licence: the Noto fonts are under the SIL Open Font License 1.1, which allows
+ * redistribution inside an application. The licence text is in each package's
+ * LICENSE file.
+ */
+
+/* Latin: English, digits, punctuation. */
+@font-face {
+  font-family: "Noto Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans/files/noto-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Latin extended. Carries the rupee sign, U+20B9, which every money figure uses. */
+@font-face {
+  font-family: "Noto Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans/files/noto-sans-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Hindi. */
+@font-face {
+  font-family: "Noto Sans Devanagari";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans-devanagari/files/noto-sans-devanagari-devanagari-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839,
+    U+A8E0-A8FF, U+11B00-11B09;
+}
+
+/* Bengali. */
+@font-face {
+  font-family: "Noto Sans Bengali";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans-bengali/files/noto-sans-bengali-bengali-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0980-09FE, U+1CD0, U+1CD2, U+1CD5-1CD6, U+1CD8, U+1CE1, U+1CEA,
+    U+1CED, U+1CF2, U+1CF5-1CF7, U+200C-200D, U+20B9, U+25CC, U+A8F1;
+}
+
+/* Malayalam. */
+@font-face {
+  font-family: "Noto Sans Malayalam";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans-malayalam/files/noto-sans-malayalam-malayalam-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0307, U+0323, U+0951-0952, U+0964-0965, U+0D00-0D7F, U+1CDA, U+1CF2, U+200C-200D, U+20B9,
+    U+25CC, U+A830-A832;
+}
+
+/* Odia. The font is named "Oriya", the script's older name in Unicode. */
+@font-face {
+  font-family: "Noto Sans Oriya";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans-oriya/files/noto-sans-oriya-oriya-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0B01-0B77, U+1CDA, U+1CF2, U+200C-200D, U+20B9, U+25CC;
+}

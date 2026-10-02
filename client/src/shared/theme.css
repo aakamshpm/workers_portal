@@ -1,0 +1,200 @@
+/*
+ * Design tokens (ADR-0019).
+ *
+ * Every colour, text size, space and radius in the three apps is declared
+ * here, once. A component writes `bg-surface` or `text-headline-md`; it never
+ * writes a hex colour or a pixel size. Changing the look of the whole product
+ * is then one edit in this file.
+ *
+ * The values come from the Stitch design, which is a Material 3 palette grown
+ * from the seed colour #0F766E. Two names surprise a reader who only saw the
+ * old brief: `primary` is the darker #005c55, used for icons, links and active
+ * text, while the seed itself is `primary-container`, used to fill a button.
+ *
+ * The design defines about fifty colours, because a generated Material palette
+ * always does. Declared here are the twenty-six the screens actually use. A
+ * token nothing uses is a token nobody maintains, and the ones left out
+ * (`primary-fixed`, `inverse-surface`, `surface-dim`, `surface-tint` and the
+ * rest) appeared only in parts of the design we are not building. Adding one
+ * back means adding it to theme.test.ts in the same edit.
+ *
+ * Tailwind 4 reads this block and builds the utilities from it, so
+ * `--color-surface` gives `bg-surface` and `text-surface`, and
+ * `--spacing-space-md` gives `p-space-md`, `gap-space-md` and the rest.
+ */
+
+@theme {
+  /* ---- Colours ---------------------------------------------------------- */
+
+  /* The seed's darker tone. Icons, links, active text, a small filled mark. */
+  --color-primary: #005c55;
+  --color-on-primary: #ffffff;
+  /* The seed itself. The filled button a worker taps to finish a screen. */
+  --color-primary-container: #0f766e;
+  --color-on-primary-container: #a3faef;
+
+  /* A chosen row, and a quiet panel that explains rather than warns. */
+  --color-secondary: #216963;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #a8ece5;
+  --color-on-secondary-container: #266d68;
+
+  /* Blue, kept apart from the teal: a link to another record, an officer's
+     own action. Never used for money and never for a warning. */
+  --color-tertiary: #005584;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #136ea6;
+  --color-on-tertiary-container: #daebff;
+
+  /* A refused action, a disputed record, a failed check. */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* The page, and the five depths above it. `surface-container-lowest` is
+     white, which is a card; the numbers rise as the fill gets stronger, so an
+     input sits on `low` and a filled digit box on `high`. */
+  --color-surface: #f8f9ff;
+  --color-on-surface: #0b1c30;
+  --color-on-surface-variant: #3e4947;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e5eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d3e4fe;
+
+  /* Borders. `outline` is a control's own edge and reaches 3:1 against the
+     page, which is the contrast a boundary needs. `outline-variant` is the
+     quiet one, for a divider between rows. */
+  --color-outline: #6e7977;
+  --color-outline-variant: #bdc9c6;
+
+  /* ---- Fonts ------------------------------------------------------------ */
+
+  /*
+   * One family across five scripts (ADR-0015), so switching language changes
+   * the words and not the look. Each Noto file covers one script and the
+   * browser picks by character, which is why they are listed side by side
+   * rather than nested. The files are served from the repository, not from a
+   * CDN, because the app has to open offline (ADR-0018).
+   */
+  --font-sans:
+    "Noto Sans", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Malayalam",
+    "Noto Sans Oriya", ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * The design writes a pair of classes on every piece of text, for example
+   * `font-headline-md text-headline-md`. Every role is the same family, so
+   * these aliases exist only so markup copied from the design keeps working.
+   */
+  --font-stat-callout: var(--font-sans);
+  --font-headline-lg: var(--font-sans);
+  --font-headline-md: var(--font-sans);
+  --font-headline-sm: var(--font-sans);
+  --font-body-lg: var(--font-sans);
+  --font-body-lg-medium: var(--font-sans);
+  --font-body-lg-bold: var(--font-sans);
+  --font-label-md: var(--font-sans);
+  --font-label-sm: var(--font-sans);
+
+  /* ---- Text sizes ------------------------------------------------------- */
+
+  /*
+   * Nine steps, each with its line height and weight, so a heading cannot be
+   * built by guessing at a size and a weight separately.
+   *
+   * Sizes are in px, not rem, on purpose. A worker who has enlarged text in
+   * Android would otherwise get a 28px amount of money grown to 40px, which
+   * breaks every row that has a figure and a label side by side. The layout
+   * stays readable because the smallest step is already 14px and body text is
+   * 16px, rather than because the browser rescales it.
+   */
+
+  /* An amount of money, the largest thing on any screen. */
+  --text-stat-callout: 28px;
+  --text-stat-callout--line-height: 36px;
+  --text-stat-callout--font-weight: 700;
+
+  /* The question a screen asks, when it is the only thing on the screen. */
+  --text-headline-lg: 24px;
+  --text-headline-lg--line-height: 32px;
+  --text-headline-lg--font-weight: 700;
+
+  /* The usual page title. */
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 700;
+
+  /* A card's own title, and the app name in the header. */
+  --text-headline-sm: 18px;
+  --text-headline-sm--line-height: 26px;
+  --text-headline-sm--font-weight: 600;
+
+  /* Ordinary sentences. Never smaller than this, indoors or out. */
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-lg-medium: 16px;
+  --text-body-lg-medium--line-height: 24px;
+  --text-body-lg-medium--font-weight: 500;
+
+  --text-body-lg-bold: 16px;
+  --text-body-lg-bold--line-height: 24px;
+  --text-body-lg-bold--font-weight: 700;
+
+  /* A badge, a column heading, a date under a figure. */
+  --text-label-md: 14px;
+  --text-label-md--line-height: 20px;
+  --text-label-md--font-weight: 500;
+
+  --text-label-sm: 14px;
+  --text-label-sm--line-height: 20px;
+  --text-label-sm--font-weight: 400;
+
+  /* ---- Spacing ---------------------------------------------------------- */
+
+  /* Six steps, every one a multiple of four. */
+  --spacing-space-xs: 0.25rem; /*  4px */
+  --spacing-space-sm: 0.5rem; /*   8px */
+  --spacing-space-md: 0.75rem; /* 12px */
+  --spacing-space-lg: 1rem; /*    16px */
+  --spacing-space-xl: 1.5rem; /*  24px */
+  --spacing-space-2xl: 2rem; /*   32px */
+
+  /* The page's side margin, and the gap between columns in a grid. */
+  --spacing-margin: 1rem;
+  --spacing-margin-desktop: 2rem;
+  --spacing-gutter: 1rem;
+  --spacing-gutter-desktop: 1.5rem;
+
+  /* ---- Shape ------------------------------------------------------------ */
+
+  --radius-sm: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem; /* a card, an input, a digit box */
+
+  /* ---- Sizes a finger has to hit ---------------------------------------- */
+
+  /*
+   * Below 48px a tap starts to miss, which for a worker signing a wage record
+   * outdoors means a wrong answer, not an annoyance. These are the design's
+   * own heights, all at or above that floor.
+   */
+  --size-touch: 48px; /* the smallest thing a finger may be asked to hit */
+  --size-button: 52px; /* the wide button that finishes a screen */
+  --size-control: 48px; /* an input, and an ordinary button */
+  --size-digit-box: 56px; /* one box of a PIN or a code */
+  --size-header: 56px; /* the fixed bar at the top */
+
+  /*
+   * A row action on the officer website. That app is a website and never
+   * installable (principle 7), so it is read with a mouse, and a table of
+   * complaints cannot give every row a 48px control without becoming a page of
+   * buttons. 40px is below the finger floor above and well over the 24px
+   * minimum that WCAG 2.2 sets for a pointer target. Do not use it in the
+   * worker or contractor app.
+   */
+  --size-control-sm: 40px;
+}

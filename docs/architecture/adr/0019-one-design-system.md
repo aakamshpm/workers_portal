@@ -25,12 +25,13 @@ The design's HTML also contains text and controls the product does not have, so 
 - **No claim of a government link.** The design's "National Public Labour Register", "Kerala Labour Welfare Board", Aadhaar checks, wage slips, Acts, docket numbers and "legally protected" lines are removed. What we may say is what is true: a record is sealed when it is written, and a change to it is detected. A worker acting on a false promise of official backing is worse off than one who was told plainly what the app does.
 - **The system keyboard, not a drawn keypad.** The design draws a 3×4 numeric keypad on four screens. Numeric inputs keep `inputMode="numeric"`, because the phone's own keyboard opens anyway, it is the keyboard the worker already knows, and Android's SMS-code autofill needs a real input.
 - **Icons are inline SVG** in one `Icon` component, not the Material Symbols web font the design links. A font from a CDN does not load offline, and ADR-0018 requires the app to open offline.
-- **Fonts are served from the repo, not a CDN**, for the same reason: Noto Sans plus Devanagari, Bengali, Malayalam and Odia, subset to the characters we use.
+- **Fonts are served from the repo, not a CDN**, for the same reason: Noto Sans plus Devanagari, Bengali, Malayalam and Odia, from the pinned `@fontsource-variable` packages (SIL Open Font License 1.1). One variable file per script covers every weight, and each face declares its own `unicode-range`, so the browser fetches a script's file only when that script is drawn.
 
 ## Consequences
 
 - Every existing page is restyled. The work is client only: no route, no schema and no contract changes.
 - Page tests keep passing, because they find text and roles, not classes. Each rebuilt screen keeps its tests and gains the loading, empty and error states the design shows.
 - A colour or size change is one edit in `theme.css`.
-- Four Indic font files add roughly 300–500 KB to the build, and the service worker stores them, so the app opens offline in every language.
+- The four Indic files are about 420 KB together. The contractor and officer apps, which are English with no language menu, never fetch them. The sign-in page and the worker app do, because the language menu names each language in its own script.
+- The officer website gets one smaller control size, 40px, for dense tables read with a mouse. The worker and contractor apps never use it, since they are used with a finger outdoors.
 - The design files stay outside the repository, and the PNG and HTML for each screen are reference only.

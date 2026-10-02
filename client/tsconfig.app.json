@@ -20,5 +20,11 @@
     "types": ["vite/client"]
   },
   "include": ["src"],
-  "exclude": ["src/entries.test.ts", "src/sw.test.ts"]
+  "exclude": [
+    "src/entries.test.ts",
+    "src/sw.test.ts",
+    "src/shared/theme.test.ts",
+    "src/shared/fonts.test.ts",
+    "src/shared/components/icons.source.test.ts"
+  ]
 }
