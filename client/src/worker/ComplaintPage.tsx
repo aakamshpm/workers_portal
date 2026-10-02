@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { api } from "../shared/api";
 import type { AuthUser, Complaint, ContractBalance } from "../shared/types";
 import {
@@ -13,6 +13,7 @@ import {
   formatRupees,
   InfoNote,
   inputClass,
+  Note,
   SuccessNote,
 } from "../shared/components/ui";
 
@@ -77,6 +78,7 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chosen = balances.find((b) => b.offerId === offerId);
+  const factsId = useId();
 
   async function submit() {
     setBusy(true);
@@ -113,7 +115,7 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-space-lg">
       {error && <ErrorNote message={error} />}
       {flash && <SuccessNote>{flash}</SuccessNote>}
 
@@ -122,7 +124,7 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
         description="Your work records are sent with this."
       >
         <form
-          className="space-y-4 px-5 py-4"
+          className="flex flex-col gap-space-lg px-space-lg py-space-md"
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -140,42 +142,56 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
               required
             >
               {balances.map((b) => (
+                // The site alone, because a phone's select box shows one short
+                // line. Who and when are under it, for the job that is chosen.
                 <option key={b.offerId} value={b.offerId}>
-                  {b.siteName} · {b.contractor.name} · began {formatDate(b.startDate)}
+                  {b.siteName}
                 </option>
               ))}
             </select>
           </Field>
 
           {chosen && (
-            <div className="rounded-md bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
-              <p className="font-medium text-slate-800">What the records say about this work</p>
-              <p className="mt-1">
-                {formatRupees(chosen.dailyRate)} a day, which you agreed to on{" "}
-                {chosen.acceptedAt ? formatDate(chosen.acceptedAt) : "—"} ·{" "}
-                {formatDays(chosen.daysWorked)} days written down · you earned{" "}
-                {formatRupees(chosen.earned)} · you were paid {formatRupees(chosen.paid)} ·{" "}
-                <span className="font-semibold text-slate-900">
-                  {formatRupees(Math.max(0, chosen.balance))} still owed to you
+            <section
+              aria-labelledby={factsId}
+              className="flex flex-col gap-space-sm rounded-xl bg-surface-container-low p-space-md"
+            >
+              <p className="font-label-md text-label-md text-on-surface-variant">
+                {chosen.contractor.name} · began {formatDate(chosen.startDate)}
+              </p>
+              <h3 id={factsId} className="font-body-lg-bold text-body-lg-bold text-on-surface">
+                What the records say about this work
+              </h3>
+              <dl className="grid grid-cols-2 gap-x-space-lg gap-y-space-sm">
+                <Fact label="Pay for one day" value={formatRupees(chosen.dailyRate)} />
+                <Fact label="Days written down" value={formatDays(chosen.daysWorked)} />
+                <Fact label="You earned" value={formatRupees(chosen.earned)} />
+                <Fact label="You were paid" value={formatRupees(chosen.paid)} />
+              </dl>
+              <p className="font-body-lg text-body-lg text-on-surface">
+                Still owed to you:{" "}
+                <span className="font-body-lg-bold text-body-lg-bold tabular-nums whitespace-nowrap text-error">
+                  {formatRupees(Math.max(0, chosen.balance))}
                 </span>
               </p>
+              <p className="font-label-md text-label-md text-on-surface-variant">
+                You agreed to this pay on {chosen.acceptedAt ? formatDate(chosen.acceptedAt) : "—"}.
+              </p>
               {chosen.awaitingConfirmation > 0 && (
-                <p className="mt-1 text-amber-700">
-                  There {chosen.awaitingConfirmation === 1 ? "is" : "are"}{" "}
-                  {chosen.awaitingConfirmation} thing
+                <Note tone="warning">
+                  There {chosen.awaitingConfirmation === 1 ? "is" : "are"} {chosen.awaitingConfirmation} thing
                   {chosen.awaitingConfirmation === 1 ? "" : "s"} you have not checked yet. Check{" "}
-                  {chosen.awaitingConfirmation === 1 ? "it" : "them"} first, and your complaint
-                  becomes stronger.
-                </p>
+                  {chosen.awaitingConfirmation === 1 ? "it" : "them"} first, and your complaint becomes stronger.
+                </Note>
               )}
               {chosen.disputedRecords > 0 && (
-                <p className="mt-1 text-rose-700">
+                <Note tone="info">
                   You have already said {chosen.disputedRecords} thing
-                  {chosen.disputedRecords === 1 ? "" : "s"} here{" "}
-                  {chosen.disputedRecords === 1 ? "is" : "are"} wrong. The officer can see that.
-                </p>
+                  {chosen.disputedRecords === 1 ? "" : "s"} here {chosen.disputedRecords === 1 ? "is" : "are"} wrong.
+                  The officer can see that.
+                </Note>
               )}
-            </div>
+            </section>
           )}
 
           <Field label="What is wrong?">
@@ -194,11 +210,12 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
             </select>
           </Field>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-space-lg sm:grid-cols-2">
             <Field label="How much do you think you are owed? (₹)" hint="Change this number if it is not what you mean.">
               <input
                 className={inputClass}
                 type="number"
+                inputMode="numeric"
                 min="1"
                 value={claimedAmount}
                 onChange={(e) => setClaimedAmount(e.target.value)}
@@ -235,7 +252,7 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
 
           <InfoNote>This does not change your records. The officer will see both sides.</InfoNote>
 
-          <Button type="submit" disabled={busy || description.trim().length < 10 || !category}>
+          <Button type="submit" size="page" icon="send" busy={busy} disabled={description.trim().length < 10 || !category}>
             {busy ? "Sending…" : "Send to the labour office"}
           </Button>
         </form>
@@ -245,26 +262,26 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
         {mine.length === 0 ? (
           <EmptyState>You have not made any complaints.</EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-outline-variant">
             {mine.map((c) => (
-              <li key={c.id} className="px-5 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-slate-900">
+              <li key={c.id} className="flex flex-col gap-space-xs px-space-lg py-space-md">
+                <div className="flex flex-wrap items-center justify-between gap-space-sm">
+                  <p className="font-body-lg-bold text-body-lg-bold text-on-surface">
                     {categories.find((x) => x.id === c.category)?.label ?? c.category}
                     {c.claimedAmount ? ` · ${formatRupees(c.claimedAmount)}` : ""}
                   </p>
                   <ComplaintBadge status={c.status} />
                 </div>
-                <p className="mt-1 text-xs text-slate-600">{c.description}</p>
-                <p className="mt-1 text-xs text-slate-400">You sent this on {formatDate(c.createdAt)}</p>
+                <p className="font-body-lg text-body-lg break-words text-on-surface">{c.description}</p>
+                <p className="font-label-md text-label-md text-on-surface-variant">You sent this on {formatDate(c.createdAt)}</p>
 
                 {c.actions.length > 0 && (
-                  <ol className="mt-2 space-y-1.5 border-l-2 border-slate-200 pl-3">
+                  <ol className="mt-space-sm flex flex-col gap-space-sm border-l-2 border-outline-variant pl-space-md">
                     {c.actions.map((a) => (
-                      <li key={a.id} className="text-xs">
-                        <span className="font-medium text-slate-700">{actionLabel(a.kind)}</span>
+                      <li key={a.id} className="font-label-md text-label-md">
+                        <span className="font-semibold text-on-surface">{actionLabel(a.kind)}</span>
                         {a.escalatedTo && (
-                          <span className="text-slate-600">
+                          <span className="text-on-surface">
                             {" "}
                             →{" "}
                             {a.escalatedTo === "POLICE"
@@ -272,15 +289,15 @@ export default function ComplaintPage({ user }: { user: AuthUser }) {
                               : "the Labour Commissioner, who can order your money to be paid"}
                           </span>
                         )}
-                        <span className="text-slate-400"> · {formatDate(a.createdAt)}</span>
-                        {a.note && <p className="text-slate-600">{a.note}</p>}
+                        <span className="text-on-surface-variant"> · {formatDate(a.createdAt)}</span>
+                        {a.note && <p className="break-words text-on-surface">{a.note}</p>}
                       </li>
                     ))}
                   </ol>
                 )}
 
                 {c.outcomeNote && (
-                  <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  <p className="mt-space-sm rounded-lg bg-surface-container-low px-space-md py-space-sm font-body-lg text-body-lg text-on-surface">
                     What the officer decided: {c.outcomeNote}
                   </p>
                 )}
@@ -304,4 +321,13 @@ function actionLabel(kind: string): string {
     ESCALATED: "Sent to a higher office",
   };
   return map[kind] ?? kind;
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="font-label-sm text-label-sm text-on-surface-variant">{label}</dt>
+      <dd className="font-body-lg-bold text-body-lg-bold tabular-nums whitespace-nowrap text-on-surface">{value}</dd>
+    </div>
+  );
 }

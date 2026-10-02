@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { api } from "../shared/api";
 import type { AuthUser, AwaitingItem, ContractBalance, Disagreement, Offer } from "../shared/types";
 import BalanceCard from "../shared/components/BalanceCard";
 import { useT } from "../shared/i18n";
 import DisagreementList from "../shared/components/DisagreementList";
+import Icon from "../shared/components/Icon";
 import {
   Button,
   Card,
@@ -68,22 +69,28 @@ export default function WorkerDashboard({
     void load();
   }, [load]);
 
+  const owedId = useId();
+
   if (loading) return <EmptyState>{t("pleaseWait")}</EmptyState>;
 
   const totalOwed = balances.reduce((sum, b) => sum + Math.max(0, b.balance), 0);
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-space-lg">
       {error && <ErrorNote message={error} />}
       {flash && <SuccessNote>{flash}</SuccessNote>}
 
+      {/* The number he came for, first and largest (design W1). */}
       {totalOwed > 0 && (
-        <div className="rounded-lg bg-slate-900 px-5 py-4 text-white">
-          <p className="text-xs text-slate-300">
+        <section
+          aria-labelledby={owedId}
+          className="flex flex-col gap-space-xs rounded-xl bg-primary px-space-lg py-space-lg text-on-primary shadow-sm"
+        >
+          <p id={owedId} className="font-body-lg-medium text-body-lg-medium">
             {t("owedHeadline", { name: user.name, count: balances.length })}
           </p>
-          <p className="text-3xl font-semibold tabular-nums">{formatRupees(totalOwed)}</p>
-        </div>
+          <p className="font-headline-lg text-[40px] leading-[48px] tabular-nums">{formatRupees(totalOwed)}</p>
+        </section>
       )}
 
       {offers.length > 0 && (
@@ -91,7 +98,7 @@ export default function WorkerDashboard({
           title={t("offerTitle")}
           description={t("offerDescription")}
         >
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-outline-variant">
             {offers.map((offer) => (
               <OfferRow
                 key={offer.id}
@@ -114,7 +121,7 @@ export default function WorkerDashboard({
         {awaiting.length === 0 ? (
           <EmptyState>{t("nothingWaiting")}</EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-outline-variant">
             {awaiting.map((item) => (
               <AwaitingRow
                 key={`${item.kind}-${item.id}`}
@@ -142,22 +149,22 @@ export default function WorkerDashboard({
         />
       )}
 
-      <div>
-        <h2 className="mb-2 text-sm font-semibold text-slate-900">{t("yourWork")}</h2>
+      <div className="flex flex-col gap-space-sm">
+        <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("yourWork")}</h2>
         {balances.length === 0 ? (
           <Card>
             <EmptyState>{t("noJobYet")}</EmptyState>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-space-md">
             {balances.map((b) => (
               <BalanceCard
                 key={b.offerId}
                 balance={b}
                 viewer="WORKER"
                 footer={
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-slate-500">
+                  <div className="flex flex-col gap-space-sm">
+                    <p className="font-label-md text-label-md text-on-surface-variant">
                       {t(
                         !b.acceptedVia ? "saidYesOn" : b.acceptedVia === "SMS" ? "saidYesBySms" : "saidYesByApp",
                         { date: b.acceptedAt ? formatDate(b.acceptedAt) : "—" },
@@ -165,7 +172,7 @@ export default function WorkerDashboard({
                       {b.openComplaints > 0 && ` · ${t("openComplaints", { count: b.openComplaints })}`}
                     </p>
                     {onFileComplaint && b.openComplaints === 0 && (
-                      <Button variant="secondary" onClick={onFileComplaint}>
+                      <Button variant="secondary" icon="support_agent" full onClick={onFileComplaint}>
                         {t("askOfficeHelp")}
                       </Button>
                     )}
@@ -212,53 +219,62 @@ function OfferRow({
   }
 
   return (
-    <li className="px-5 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-900">
+    <li className="flex flex-col gap-space-md px-space-lg py-space-md">
+      <div className="flex items-start justify-between gap-space-md">
+        <div className="min-w-0">
+          <p className="font-body-lg-bold text-body-lg-bold break-words text-on-surface">
             {t("offerAt", { work: offer.workType, site: offer.siteName })}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="font-label-md text-label-md break-words text-on-surface-variant">
             {offer.contractor.name}
-            {offer.contractor.company ? ` · ${offer.contractor.company}` : ""} ·{" "}
-            {t("offerMeta", { date: formatDate(offer.startDate), days: offer.expectedDays })}
+            {offer.contractor.company ? ` · ${offer.contractor.company}` : ""}
           </p>
-          {offer.extraTerms && (
-            <p className="mt-1 text-xs text-slate-600">{t("alsoPromised", { terms: offer.extraTerms })}</p>
-          )}
         </div>
-        <div className="text-right">
-          <p className="text-lg font-semibold tabular-nums text-slate-900">
+        {/* The agreed pay, which locks when he says yes. */}
+        <p className="shrink-0 rounded-lg bg-secondary-container px-space-sm py-space-xs text-right text-on-secondary-container">
+          <span className="block font-body-lg-bold text-body-lg-bold tabular-nums whitespace-nowrap">
             {formatRupees(offer.dailyRate)}
-          </p>
-          <p className="text-xs text-slate-500">{t("aDay")}</p>
-        </div>
+          </span>
+          <span className="block font-label-sm text-label-sm">{t("aDay")}</span>
+        </p>
       </div>
 
-      <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <p className="flex items-start gap-space-sm font-label-md text-label-md text-on-surface-variant">
+        <Icon name="calendar_month" size={18} className="mt-0.5 shrink-0" />
+        {t("offerMeta", { date: formatDate(offer.startDate), days: offer.expectedDays })}
+      </p>
+      {offer.extraTerms && (
+        <p className="font-label-md text-label-md break-words text-on-surface">{t("alsoPromised", { terms: offer.extraTerms })}</p>
+      )}
+
+      <p className="flex items-start gap-space-sm rounded-lg bg-surface-container-low px-space-md py-space-sm font-body-lg text-body-lg text-on-surface">
+        <Icon name="payments" className="mt-0.5 shrink-0 text-primary" />
         {t("offerTotal", {
           days: offer.expectedDays,
           amount: formatRupees(offer.dailyRate * offer.expectedDays),
         })}
-      </div>
+      </p>
 
       {!refusing ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button variant="primary" disabled={busy} onClick={() => void respond("ACCEPT")}>
+        <div className="flex flex-col gap-space-sm">
+          <Button variant="primary" size="page" icon="check_circle" busy={busy} onClick={() => void respond("ACCEPT")}>
             {busy ? t("sending") : t("yesTakeWork")}
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => setRefusing(true)}>
+          <Button variant="secondary" full disabled={busy} onClick={() => setRefusing(true)}>
             {t("noDontWant")}
           </Button>
-          <OfferBadge status={offer.status} />
-          {offer.ref && (
-            <span className="text-xs text-slate-400">
-              {t("replyYesSms", { ref: offer.ref })}
-            </span>
-          )}
+          <div className="flex flex-wrap items-center justify-center gap-space-sm">
+            <OfferBadge status={offer.status} />
+            {offer.ref && (
+              <span className="flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
+                <Icon name="sms" size={18} className="shrink-0" />
+                {t("replyYesSms", { ref: offer.ref })}
+              </span>
+            )}
+          </div>
         </div>
       ) : (
-        <div className="mt-3 space-y-2">
+        <div className="flex flex-col gap-space-sm">
           <Field label={t("whySayNo")}>
             <input
               className={inputClass}
@@ -266,11 +282,11 @@ function OfferRow({
               onChange={(e) => setReason(e.target.value)}
             />
           </Field>
-          <div className="flex gap-2">
-            <Button variant="danger" disabled={busy} onClick={() => void respond("DECLINE")}>
+          <div className="grid grid-cols-2 gap-space-sm">
+            <Button variant="danger" full busy={busy} onClick={() => void respond("DECLINE")}>
               {busy ? t("sending") : t("sendMyNo")}
             </Button>
-            <Button variant="ghost" onClick={() => setRefusing(false)}>
+            <Button variant="ghost" full onClick={() => setRefusing(false)}>
               {t("goBack")}
             </Button>
           </div>
@@ -327,15 +343,18 @@ function AwaitingRow({
   }
 
   return (
-    <li className="px-5 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-900">
+    <li className="flex flex-col gap-space-md px-space-lg py-space-md">
+      <div className="flex items-start gap-space-md">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+          <Icon name={isWork ? "calendar_month" : "payments"} size={22} />
+        </span>
+        <div className="flex min-w-0 flex-col gap-space-xs">
+          <p className="font-body-lg-bold text-body-lg-bold break-words text-on-surface">
             {isWork
               ? t("heSaysDays", { days: formatDays(item.days ?? 0) })
               : t("heSaysPaid", { amount: formatRupees(item.amount ?? 0) })}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="font-label-md text-label-md break-words text-on-surface-variant">
             {isWork
               ? t("dateRange", { from: formatDate(item.fromDate!), to: formatDate(item.toDate!) })
               : t("paidOnBy", {
@@ -346,34 +365,45 @@ function AwaitingRow({
             {item.contractorName}
             {item.company ? ` (${item.company})` : ""} · {item.siteName}
           </p>
-          {item.note && <p className="mt-1 text-xs text-slate-600">{t("heWrote", { note: item.note })}</p>}
-        </div>
-        {isWork && item.worth !== undefined && (
-          <div className="text-right">
-            <p className="text-xs text-slate-500">{t("worthLabel")}</p>
-            <p className="text-sm font-semibold tabular-nums text-slate-900">
-              {formatRupees(item.worth)}
+          {/* What the days are worth, on its own line under the dates, so it
+              never floats alone at the right edge of a narrow phone. */}
+          {isWork && item.worth !== undefined && (
+            <p className="font-label-md text-label-md text-on-surface">
+              {t("worthLabel")}{" "}
+              <span className="font-body-lg-bold text-body-lg-bold tabular-nums whitespace-nowrap">
+                {formatRupees(item.worth)}
+              </span>
             </p>
-          </div>
-        )}
+          )}
+          {item.note && (
+            <p className="font-label-md text-label-md break-words text-on-surface">{t("heWrote", { note: item.note })}</p>
+          )}
+        </div>
       </div>
 
       {!objecting ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button variant="primary" disabled={busy} onClick={() => void decide("CONFIRM")}>
-            {busy ? t("sending") : isWork ? t("yesCorrect") : t("yesGotMoney")}
-          </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => setObjecting(true)}>
-            {isWork ? t("noNotCorrect") : t("noDidNotGet")}
-          </Button>
+        <div className="flex flex-col gap-space-sm">
+          {/* The two answers side by side and the same size, so neither looks
+              like the one he is expected to choose. Below 360px they stack,
+              because each would be 124px wide and the Malayalam answer would
+              take three lines. */}
+          <div className="grid grid-cols-2 gap-space-sm max-[359px]:grid-cols-1">
+            <Button variant="primary" full busy={busy} onClick={() => void decide("CONFIRM")}>
+              {busy ? t("sending") : isWork ? t("yesCorrect") : t("yesGotMoney")}
+            </Button>
+            <Button variant="danger-tonal" full disabled={busy} onClick={() => setObjecting(true)}>
+              {isWork ? t("noNotCorrect") : t("noDidNotGet")}
+            </Button>
+          </div>
           {item.ref && (
-            <span className="text-xs text-slate-400">
+            <p className="flex items-center justify-center gap-space-xs text-center font-label-md text-label-md text-on-surface-variant">
+              <Icon name="sms" size={18} className="shrink-0" />
               {t("replyOkWrongSms", { ref: item.ref })}
-            </span>
+            </p>
           )}
         </div>
       ) : (
-        <div className="mt-3 space-y-2 rounded-md bg-rose-50 p-3 ring-1 ring-inset ring-rose-200">
+        <div className="flex flex-col gap-space-md rounded-xl bg-error-container/40 p-space-md ring-1 ring-error-container">
           <Field
             label={isWork ? t("realDays") : t("realMoney")}
             hint={t("writeRightNumber")}
@@ -381,6 +411,7 @@ function AwaitingRow({
             <input
               className={inputClass}
               type="number"
+              inputMode="decimal"
               step={isWork ? "0.5" : "1"}
               min="0"
               value={workerValue}
@@ -395,11 +426,11 @@ function AwaitingRow({
               onChange={(e) => setNote(e.target.value)}
             />
           </Field>
-          <div className="flex gap-2">
-            <Button variant="danger" disabled={busy} onClick={() => void decide("REJECT")}>
+          <div className="grid grid-cols-2 gap-space-sm">
+            <Button variant="danger" full busy={busy} onClick={() => void decide("REJECT")}>
               {busy ? t("sending") : t("sendMyAnswer")}
             </Button>
-            <Button variant="ghost" onClick={() => setObjecting(false)}>
+            <Button variant="ghost" full onClick={() => setObjecting(false)}>
               {t("goBack")}
             </Button>
           </div>

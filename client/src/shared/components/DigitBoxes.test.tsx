@@ -8,8 +8,7 @@ import DigitBoxes from "./DigitBoxes";
  * it is used.
  *
  * What this guarantees: each box is the design's 56px tall, and on a narrow
- * phone six boxes shrink to fit the width instead of running off the screen,
- * but never below the 48px a finger can hit.
+ * phone six boxes shrink to fit the width instead of running off the screen.
  */
 describe("DigitBoxes", () => {
   const boxes = () => screen.getAllByRole("textbox") as HTMLInputElement[];
@@ -19,11 +18,15 @@ describe("DigitBoxes", () => {
     for (const b of boxes()) expect(b.className).toContain("h-[var(--size-digit-box)]");
   });
 
-  it("shares the width on a narrow phone, and never goes below a finger's width", () => {
+  it("shares the width, so six boxes fit a 320px phone instead of running off it", () => {
+    // Six 48px boxes and five 8px gaps are 328px, and a 320px phone has 288px
+    // inside its margins. So a box may be narrower than 48px; it keeps its
+    // 56px height, which is the part a thumb lands on.
     render(<DigitBoxes label="Code" length={6} value="" onChange={() => {}} />);
     for (const b of boxes()) {
       expect(b.className).toContain("flex-1");
-      expect(b.className).toContain("min-w-[var(--size-touch)]");
+      expect(b.className).toContain("min-w-0");
+      expect(b.className).not.toContain("min-w-[var(--size-touch)]");
       expect(b.className).toContain("max-w-[var(--size-digit-box)]");
     }
   });

@@ -1,11 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { NavLink, Navigate, Outlet } from "react-router-dom";
 import { clearSession, getStoredUser } from "./api";
 import { SIGN_IN, appFor } from "./apps";
 import { leaveTo } from "./leave";
 import type { AuthUser, Role } from "./types";
-import { LanguagePicker, useT } from "./i18n";
+import { LanguagePicker, stateName, useT } from "./i18n";
 import { install, useCanInstall } from "./install";
+import AppHeader from "./components/AppHeader";
+import Icon, { type IconName } from "./components/Icon";
+import { Button, formatPhone } from "./components/ui";
 
 const ROLE_LABEL: Record<Role, string> = {
   CONTRACTOR: "Contractor",
@@ -17,6 +20,8 @@ export interface Tab {
   /** Relative to the app, for example "work" inside /worker/. */
   path: string;
   label: string;
+  /** Shown above the label in the worker app's bottom bar. */
+  icon?: IconName;
 }
 
 /**
@@ -50,18 +55,177 @@ export function useAppSession(role: Role): AuthUser | null {
  * app's first tab, so a mistyped address stays inside the app.
  */
 export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
+  // The worker app has the design's phone layout (W1). The contractor and
+  // officer apps keep the older header until their own screens are rebuilt;
+  // the officer's is a desktop website and waits for its sidebar ADR.
+  if (user.role === "WORKER") return <WorkerFrame user={user} tabs={tabs}>{children}</WorkerFrame>;
+  return <StaffFrame user={user} tabs={tabs}>{children}</StaffFrame>;
+}
+
+function signOut() {
+  clearSession();
+  leaveTo(SIGN_IN);
+}
+
+/**
+ * The worker app on a phone (design W1, ADR-0019).
+ *
+ * The header holds three things: the app name, the language list and one
+ * button for his own account. Everything about him (name, phone, home state)
+ * and "Sign out" sits behind that button, so the header fits a 320px phone in
+ * every language, and "Sign out" is never next to a thumb by accident.
+ *
+ * The sections are a bar fixed at the foot of the screen, where a thumb
+ * reaches. It comes after <main> in the page, so a screen reader reads the
+ * screen first, and <main> keeps room under its last line for the bar.
+ */
+function WorkerFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
+  const { t } = useT();
+  const canInstall = useCanInstall();
+
+  return (
+    <div className="min-h-screen bg-surface">
+      <AppHeader title={t("appTitle")}>
+        <LanguagePicker compact />
+        <AccountButton user={user} />
+      </AppHeader>
+
+      <main className="mx-auto flex max-w-2xl flex-col gap-space-lg px-margin pt-space-lg pb-[calc(var(--size-bottom-nav)+var(--spacing-space-xl))]">
+        {/* After the browser offers to install (ADR-0018). Here and not in the
+            header, which has no room for a fourth control on a small phone. */}
+        {canInstall && (
+          <Button variant="secondary" icon="install_mobile" full onClick={() => void install()}>
+            {t("installApp")}
+          </Button>
+        )}
+        {children ?? <Outlet />}
+      </main>
+
+      <nav
+        aria-label={t("sections")}
+        className="fixed inset-x-0 bottom-0 z-10 bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_var(--color-outline-variant)] backdrop-blur"
+      >
+        <ul className="mx-auto grid min-h-[var(--size-bottom-nav)] max-w-2xl grid-cols-4">
+          {tabs.map((tab) => (
+            <li key={tab.path} className="flex">
+              <NavLink
+                to={`/${tab.path}`}
+                className={({ isActive }) =>
+                  `flex min-h-[var(--size-bottom-nav)] w-full flex-col items-center justify-center gap-0.5 px-space-xs py-space-xs text-center font-label-sm text-label-sm leading-tight transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+                    isActive ? "font-semibold text-primary" : "text-on-surface-variant hover:text-on-surface"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {tab.icon && (
+                      // The active section gets a filled pill behind its icon,
+                      // so it is marked by shape as well as by colour.
+                      <span
+                        className={`flex h-7 w-14 items-center justify-center rounded-full ${
+                          isActive ? "bg-secondary-container" : ""
+                        }`}
+                      >
+                        <Icon name={tab.icon} size={22} filled={isActive} />
+                      </span>
+                    )}
+                    <span>{tab.label}</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </div>
+  );
+}
+
+/**
+ * The worker's own account: one round button, and a small panel under it with
+ * his name, phone, home state and "Sign out".
+ *
+ * The panel is a non-modal dialog. Escape or a tap outside closes it, and
+ * focus goes back to the button, so a keyboard or screen reader user is not
+ * left somewhere on the page with no idea where the panel went.
+ */
+function AccountButton({ user }: { user: AuthUser }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+
+  function close() {
+    setOpen(false);
+    button.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    panel.current?.focus();
+    function outside(e: PointerEvent) {
+      const target = e.target as Node;
+      if (!panel.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button
+        ref={button}
+        type="button"
+        aria-label={t("yourAccount")}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => (open ? close() : setOpen(true))}
+        className="flex size-[var(--size-touch)] items-center justify-center rounded-full bg-primary text-on-primary transition hover:bg-primary-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        <Icon name="person" size={24} />
+      </button>
+
+      {open && (
+        <div
+          ref={panel}
+          id={panelId}
+          role="dialog"
+          aria-label={t("yourAccount")}
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") close();
+          }}
+          className="absolute top-full right-0 z-20 mt-space-sm flex w-[min(18rem,calc(100vw-2*var(--spacing-margin)))] flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg shadow-lg ring-1 ring-outline-variant focus:outline-none"
+        >
+          <div className="flex flex-col gap-space-xs">
+            <p className="font-headline-sm text-headline-sm break-words text-on-surface">{user.name}</p>
+            <p className="font-label-md text-label-md text-on-surface-variant">
+              {t("roleWorker")}
+              {user.homeState ? ` · ${stateName(t, user.homeState)}` : ""}
+            </p>
+            <p className="font-body-lg text-body-lg whitespace-nowrap text-on-surface">
+              +91&nbsp;{formatPhone(user.phone)}
+            </p>
+          </div>
+          <Button variant="secondary" icon="logout" full onClick={signOut}>
+            {t("signOut")}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The contractor app and the officer website, unchanged until they are rebuilt. */
+function StaffFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
   // English unless the app mounts an I18nProvider. Only the worker app does (ADR-0015).
   const { t } = useT();
   // After the browser offers to install (ADR-0018). The officer app never
   // listens and has no manifest, and the role check keeps the button out of
   // it even if an offer were ever kept, since this header is shared.
   const canInstall = useCanInstall() && user.role !== "AUTHORITY";
-  const roleLabel = user.role === "WORKER" ? t("roleWorker") : ROLE_LABEL[user.role];
-
-  function signOut() {
-    clearSession();
-    leaveTo(SIGN_IN);
-  }
+  const roleLabel = ROLE_LABEL[user.role];
 
   return (
     <div className="min-h-screen bg-slate-100">

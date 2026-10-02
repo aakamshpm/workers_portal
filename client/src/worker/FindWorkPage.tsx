@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../shared/api";
 import type { DiscoveryProfile, NearbyWork, Place, PlaceSource } from "../shared/types";
 import { Button, Card, EmptyState, ErrorNote, InfoNote, PhoneLink, inputClass } from "../shared/components/ui";
+import Icon from "../shared/components/Icon";
 
 /**
  * Find Work. Contract: docs/contracts/discovery.md. ADR-0006, 0010, 0011.
@@ -207,7 +208,7 @@ export default function FindWorkPage() {
     return error ? (
       <ErrorNote message={error} />
     ) : (
-      <p className="text-sm text-slate-500">Loading your saved place…</p>
+      <p role="status" className="font-body-lg text-body-lg text-on-surface-variant">Loading your saved place…</p>
     );
   }
 
@@ -219,42 +220,40 @@ export default function FindWorkPage() {
     (place.latitude !== profile.latitude || place.longitude !== profile.longitude);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-space-lg">
       {error && <ErrorNote message={error} />}
 
       <Card title="Where are you?">
-        <div className="space-y-5 px-5 py-4">
+        <div className="flex flex-col gap-space-lg px-space-lg py-space-md">
           {place && (
-            <p className="text-sm text-slate-700">
+            <p className="flex items-center gap-space-sm font-body-lg text-body-lg text-on-surface">
+              <Icon name="location_on" filled className="shrink-0 text-primary" />
+              <span>
               Showing work near <strong>{placeName}</strong>.
+              </span>
             </p>
           )}
 
           {proposed ? (
-            <div className="space-y-3 rounded-lg bg-slate-50 p-4 ring-1 ring-inset ring-slate-200">
-              <p className="text-sm text-slate-700">You are near</p>
-              <p className="text-xl font-semibold text-slate-900">{proposed.name}</p>
-              {proposed.area && <p className="text-xs text-slate-500">{proposed.area}</p>}
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void searchAt(proposed)}>Yes, this is right</Button>
-                <Button variant="secondary" onClick={() => setProposed(null)}>
+            <div className="flex flex-col gap-space-sm rounded-xl bg-surface-container-low p-space-lg">
+              <p className="font-body-lg text-body-lg text-on-surface-variant">You are near</p>
+              <p className="font-headline-md text-headline-md break-words text-on-surface">{proposed.name}</p>
+              {proposed.area && <p className="font-label-md text-label-md text-on-surface-variant">{proposed.area}</p>}
+              <div className="grid grid-cols-2 gap-space-sm">
+                <Button full onClick={() => void searchAt(proposed)}>Yes, this is right</Button>
+                <Button variant="secondary" full onClick={() => setProposed(null)}>
                   No, I will type it
                 </Button>
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => void useMyLocation()}
-              disabled={locating}
-              className="flex min-h-14 w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:bg-slate-400"
-            >
+            <Button size="page" icon="location_on" busy={locating} onClick={() => void useMyLocation()}>
               {locating ? "Finding your town…" : "Use my location"}
-            </button>
+            </Button>
           )}
 
-          <div className="space-y-2">
-            <label htmlFor="town-search" className="block text-sm font-medium text-slate-700">
+          <div className="flex flex-col gap-space-sm">
+            <label htmlFor="town-search" className="font-body-lg-medium text-body-lg-medium text-on-surface">
               Or type the name of your town
             </label>
             <input
@@ -264,10 +263,14 @@ export default function FindWorkPage() {
               placeholder="For example: Perumbavoor"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              className={`${inputClass} min-h-12 text-base`}
+              className={`${inputClass} ring-1 ring-inset ring-outline`}
             />
 
-            {lookingUp && <p className="text-xs text-slate-500">Looking for towns…</p>}
+            {lookingUp && (
+              <p role="status" className="font-label-md text-label-md text-on-surface-variant">
+                Looking for towns…
+              </p>
+            )}
 
             {optionsSource === "fallback" && options.length > 0 && (
               <InfoNote>
@@ -277,20 +280,20 @@ export default function FindWorkPage() {
             )}
 
             {!lookingUp && typed.trim().length >= 2 && options.length === 0 && (
-              <p className="text-sm text-slate-500">No town found. Try fewer letters.</p>
+              <p className="font-body-lg text-body-lg text-on-surface-variant">No town found. Try fewer letters.</p>
             )}
 
             {options.length > 0 && (
-              <ul className="space-y-2">
+              <ul className="flex flex-col gap-space-sm">
                 {options.map((o) => (
                   <li key={`${o.name}|${o.latitude}|${o.longitude}`}>
                     <button
                       type="button"
                       onClick={() => void searchAt(o)}
-                      className="min-h-12 w-full rounded-lg bg-white px-4 py-3 text-left ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                      className="min-h-[var(--size-touch)] w-full rounded-xl bg-surface-container-lowest px-space-lg py-space-sm text-left ring-1 ring-inset ring-outline-variant transition hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                      <span className="block text-base font-medium text-slate-900">{o.name}</span>
-                      {o.area && <span className="block text-xs text-slate-500">{o.area}</span>}
+                      <span className="block font-body-lg-medium text-body-lg-medium text-on-surface">{o.name}</span>
+                      {o.area && <span className="block font-label-sm text-label-sm text-on-surface-variant">{o.area}</span>}
                     </button>
                   </li>
                 ))}
@@ -302,20 +305,20 @@ export default function FindWorkPage() {
     
 
       <Card title="Can contractors see you?">
-        <div className="space-y-3 px-5 py-4 text-sm text-slate-700">
+        <div className="flex flex-col gap-space-md px-space-lg py-space-md font-body-lg text-body-lg text-on-surface">
           {profile.looking ? (
             <>
               <p>
                 Yes. Contractors can see your name, your phone number and that you are near{" "}
                 <strong>{savedName}</strong>.
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-space-sm">
                 {choseSomewhereElse && (
-                  <Button onClick={showMeHere} disabled={saving}>
+                  <Button full onClick={showMeHere} busy={saving}>
                     Show me near {placeName} instead
                   </Button>
                 )}
-                <Button variant="secondary" onClick={stopShowingMe} disabled={saving}>
+                <Button variant="secondary" full onClick={stopShowingMe} disabled={saving}>
                   Stop showing me
                 </Button>
               </div>
@@ -326,7 +329,7 @@ export default function FindWorkPage() {
                 No. If you want contractors to find you, they will see your name, your phone
                 number and the town you chose. They will not see where your phone is.
               </p>
-              <Button onClick={showMeHere} disabled={saving}>
+              <Button full onClick={showMeHere} busy={saving}>
                 Let contractors see me near {placeName}
               </Button>
             </>
@@ -336,7 +339,11 @@ export default function FindWorkPage() {
         </div>
       </Card>
 
-      {searching && <p className="text-sm text-slate-500">Searching near {placeName}…</p>}
+      {searching && (
+        <p role="status" className="font-body-lg text-body-lg text-on-surface-variant">
+          Searching near {placeName}…
+        </p>
+      )}
 
       {results && !searching && (
         <>
@@ -351,20 +358,17 @@ export default function FindWorkPage() {
               title="Contractors hiring"
               description="Contractors near you who are hiring."
             >
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-outline-variant">
                 {results.contractors.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{c.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {[c.company, c.preferredWorkType].filter(Boolean).join(" · ")}
-                      </p>
+                  <li key={c.id} className="flex flex-col gap-space-xs px-space-lg py-space-md">
+                    <div className="flex items-start justify-between gap-space-md">
+                      <p className="min-w-0 font-body-lg-bold text-body-lg-bold break-words text-on-surface">{c.name}</p>
+                      <Distance km={c.distanceKm} />
                     </div>
-                    <div className="text-right text-sm">
-                      <p className="text-slate-700">{c.distanceKm} km</p>
+                    <p className="font-label-md text-label-md break-words text-on-surface-variant">
+                      {[c.company, c.preferredWorkType].filter(Boolean).join(" · ")}
+                    </p>
+                    <div>
                       <PhoneLink phone={c.phone} />
                     </div>
                   </li>
@@ -379,30 +383,22 @@ export default function FindWorkPage() {
               title="Public business listings"
               description="These are businesses, not job offers."
             >
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-outline-variant">
                 {results.businesses.map((b) => (
-                  <li
-                    key={b.id}
-                    className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{b.name}</p>
-                      <p className="text-xs text-slate-500">{b.category}</p>
+                  <li key={b.id} className="flex flex-col gap-space-xs px-space-lg py-space-md">
+                    <div className="flex items-start justify-between gap-space-md">
+                      <p className="min-w-0 font-body-lg-bold text-body-lg-bold break-words text-on-surface">{b.name}</p>
+                      <Distance km={b.distanceKm} />
                     </div>
-                    <div className="text-right text-sm">
-                      <p className="text-slate-700">{b.distanceKm} km</p>
-                      {/* A listing's number is often a landline with its own
-                       * area code, so it is dialled as written, not as +91
-                       * plus a mobile number. */}
-                      {b.phone && (
-                        <a
-                          href={`tel:${b.phone}`}
-                          className="font-medium text-sky-700 underline decoration-sky-300 hover:text-sky-900"
-                        >
-                          {b.phone}
-                        </a>
-                      )}
-                    </div>
+                    <p className="font-label-md text-label-md text-on-surface-variant">{b.category}</p>
+                    {/* A listing's number is often a landline with its own
+                     * area code, so it is dialled as written, not as +91
+                     * plus a mobile number. */}
+                    {b.phone && (
+                      <div>
+                        <PhoneLink phone={b.phone} asWritten />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -412,5 +408,15 @@ export default function FindWorkPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** How far away, on one line, beside the name. */
+function Distance({ km }: { km: number }) {
+  return (
+    <span className="flex shrink-0 items-center gap-space-xs font-label-md text-label-md whitespace-nowrap text-on-surface-variant">
+      <Icon name="distance" size={18} />
+      {km} km
+    </span>
   );
 }

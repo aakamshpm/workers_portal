@@ -27,6 +27,23 @@ export const LANGUAGES: { code: Language; name: string }[] = [
 
 export const DICTIONARIES: Record<Language, Messages> = { en, hi, bn, ml, or };
 
+/** Home states as the server names them, and the key of each name in the dictionaries. */
+export const STATE_KEY: Record<string, MessageKey> = {
+  "West Bengal": "stateWestBengal",
+  Bihar: "stateBihar",
+  "Uttar Pradesh": "stateUttarPradesh",
+  Jharkhand: "stateJharkhand",
+  Assam: "stateAssam",
+  Odisha: "stateOdisha",
+  Kerala: "stateKerala",
+};
+
+/** A home state in the reader's language, or as the server wrote it when it has no translation. */
+export function stateName(t: T, state: string): string {
+  const key = STATE_KEY[state];
+  return key ? t(key) : state;
+}
+
 export function isLanguage(code: unknown): code is Language {
   return typeof code === "string" && code in DICTIONARIES;
 }
@@ -101,25 +118,41 @@ export function I18nProvider({
 /**
  * The language list. Shown only inside a provider.
  *
- * A globe icon and the word "Language" in the page's current language sit next
- * to the list, so a worker who cannot read the current language still knows
- * what the control is. Each option is in its own script.
+ * A globe and the current language's name, each in its own script, so a
+ * worker who cannot read the current language still knows what the control
+ * is. The real <select> lies over the whole pill, transparent, so a tap
+ * anywhere on it opens the phone's own list and the keyboard reaches it.
+ *
+ * `compact` is the signed-in worker header, which also holds his account
+ * button. On a phone narrower than 420px it shows the globe alone, because
+ * "പണിക്കൂലി കണക്ക്" with "മലയാളം" beside it does not fit a 360px screen.
+ * The list itself is unchanged.
  */
-export function LanguagePicker({ className = "" }: { className?: string }) {
+export function LanguagePicker({ compact = false, className = "" }: { compact?: boolean; className?: string }) {
   const { language, setLanguage, t } = useT();
   if (!setLanguage) return null;
+  const current = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0]!;
   return (
-    <label
-      className={`inline-flex min-h-[var(--size-touch)] items-center gap-space-xs rounded-full bg-surface-container pl-space-md text-on-surface focus-within:ring-2 focus-within:ring-primary ${className}`}
+    <div
+      className={`relative inline-flex min-h-[var(--size-touch)] min-w-[var(--size-touch)] shrink-0 items-center justify-center gap-space-xs rounded-full bg-surface-container px-space-md text-on-surface focus-within:ring-2 focus-within:ring-primary ${
+        compact ? "max-[419px]:px-0" : ""
+      } ${className}`}
     >
-      <Icon name="language" className="text-primary" />
+      <Icon name="language" className="shrink-0 text-primary" />
+      <span
+        aria-hidden="true"
+        lang={current.code}
+        className={`font-label-md text-label-md whitespace-nowrap text-on-surface ${compact ? "max-[419px]:hidden" : ""}`}
+      >
+        {current.name}
+      </span>
       <select
         aria-label={t("language")}
         value={language}
         onChange={(e) => {
           if (isLanguage(e.target.value)) setLanguage(e.target.value);
         }}
-        className="min-h-[var(--size-touch)] cursor-pointer rounded-full border-0 bg-transparent py-0 pr-space-md pl-space-xs font-label-md text-label-md text-on-surface focus:outline-none"
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none rounded-full opacity-0"
       >
         {LANGUAGES.map((l) => (
           <option key={l.code} value={l.code} lang={l.code}>
@@ -127,6 +160,6 @@ export function LanguagePicker({ className = "" }: { className?: string }) {
           </option>
         ))}
       </select>
-    </label>
+    </div>
   );
 }

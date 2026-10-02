@@ -43,10 +43,10 @@ export default function WorkerApp() {
 function WorkerRoutes({ user }: { user: AuthUser }) {
   const { t } = useT();
   const tabs: Tab[] = [
-    { path: "work", label: t("tabMyWork") },
-    { path: "find-work", label: t("tabFindWork") },
-    { path: "help", label: t("tabHelp") },
-    { path: "records", label: t("tabRecords") },
+    { path: "work", label: t("tabMyWork"), icon: "engineering" },
+    { path: "find-work", label: t("tabFindWork"), icon: "work" },
+    { path: "help", label: t("tabHelp"), icon: "support_agent" },
+    { path: "records", label: t("tabRecords"), icon: "receipt_long" },
   ];
 
   return (

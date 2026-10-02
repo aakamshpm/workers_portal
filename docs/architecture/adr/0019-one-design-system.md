@@ -35,3 +35,7 @@ The design's HTML also contains text and controls the product does not have, so 
 - The four Indic files are about 420 KB together. The contractor and officer apps, which are English with no language menu, never fetch them. The sign-in page and the worker app do, because the language menu names each language in its own script.
 - The officer website gets one smaller control size, 40px, for dense tables read with a mouse. The worker and contractor apps never use it, since they are used with a finger outdoors.
 - The design files stay outside the repository, and the PNG and HTML for each screen are reference only.
+- Measured on a 320px phone, the narrowest Android screen still sold, in all five languages:
+  - The six code boxes are about 41px wide and keep their 56px height. Six 48px boxes with their gaps need 328px, and the screen has 288px inside its margins. WCAG 2.2 asks 24px for a target, and the height is the side a thumb lands on.
+  - Below 400px the header name drops its icon and is 16px. Below 420px the worker header shows the language list as a globe alone, because "പണിക്കൂലി കണക്ക്" and "മലയാളം" do not fit beside the account button.
+- The worker app has the design's phone frame (W1): the app name, the language list and one account button in the header, with name, phone, home state and "Sign out" in a small panel behind that button, and the four sections as a bar fixed at the foot of the screen. The contractor and officer apps keep their older header until their own screens are rebuilt.

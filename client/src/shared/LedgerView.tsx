@@ -34,6 +34,28 @@ const FILTERS: { id: RecordType; label: MessageKey }[] = [
  * where other people's records sit. A changed record is marked in red after
  * "Check all records".
  */
+/**
+ * A summary with each ISO date (2026-07-06) held on one line. The browser may
+ * break a line at a hyphen, and "2026-" at the end of one line with "07-06"
+ * on the next reads as two numbers. The words around the dates still wrap.
+ */
+function Summary({ text }: { text: string }) {
+  const parts = text.split(/(\d{4}-\d{2}-\d{2})/);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <span key={i} className="whitespace-nowrap">
+            {part}
+          </span>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
 export default function LedgerView() {
   const { t } = useT();
   const [data, setData] = useState<LedgerResponse | null>(null);
@@ -56,7 +78,7 @@ export default function LedgerView() {
   const count = (t: RecordType) => all.filter((e) => e.recordType === t).length;
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-space-lg">
       <VerifyPanel
         onVerified={(r) => {
           setVerification(r);
@@ -68,63 +90,84 @@ export default function LedgerView() {
 
       {error && <ErrorNote message={error} />}
 
-      <Card
-        title={t("recordsTitle")}
-        description={t("recordsDescription")}
-        actions={
-          <div className="flex flex-wrap rounded-md ring-1 ring-inset ring-slate-300">
-            {[{ id: "ALL" as const, label: `${t("filterAll")} ${all.length}` }, ...FILTERS.map((f) => ({
-              id: f.id,
-              label: `${t(f.label)} ${count(f.id)}`,
-            }))].map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id)}
-                className={`px-2.5 py-1.5 text-xs font-medium transition first:rounded-l-md last:rounded-r-md ${
-                  filter === f.id
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        }
-      >
+      <Card title={t("recordsTitle")} description={t("recordsDescription")}>
+        {/* The filters scroll inside their own row, so seven of them never
+            make the page wider than the phone. */}
+        <div
+          role="group"
+          aria-label={t("show")}
+          className="flex gap-space-sm overflow-x-auto border-b border-outline-variant px-space-lg py-space-md"
+        >
+          {[
+            { id: "ALL" as const, label: `${t("filterAll")} ${all.length}` },
+            ...FILTERS.map((f) => ({ id: f.id, label: `${t(f.label)} ${count(f.id)}` })),
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              aria-pressed={filter === f.id}
+              onClick={() => setFilter(f.id)}
+              className={`min-h-[var(--size-touch)] shrink-0 rounded-full px-space-lg whitespace-nowrap font-label-md text-label-md transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                filter === f.id
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         {!data ? (
-          <EmptyState>{t("loading")}</EmptyState>
+          error ? null : <EmptyState>{t("loading")}</EmptyState>
         ) : entries.length === 0 ? (
-          <EmptyState>
-            {filter === "ALL"
-              ? t("nothingYet")
-              : t("nothingOfKind")}
-          </EmptyState>
+          <EmptyState>{filter === "ALL" ? t("nothingYet") : t("nothingOfKind")}</EmptyState>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase">
+          <>
+            {/* A phone: one card per record (design W7). A table of three
+                columns at 320px gave the summary 80px and scrolled sideways. */}
+            <ul aria-label={t("recordsTitle")} className="divide-y divide-outline-variant sm:hidden">
+              {entries.map((e) => {
+                const bad = flagged.has(e.chainIndex);
+                return (
+                  <li key={e.id} className={`flex flex-col gap-space-xs px-space-lg py-space-md ${bad ? "bg-error-container" : ""}`}>
+                    <div className="flex items-center justify-between gap-space-sm">
+                      <RecordTypeBadge type={e.recordType} />
+                      <span className="font-label-sm text-label-sm whitespace-nowrap text-on-surface-variant">
+                        {formatDate(e.createdAt)}
+                      </span>
+                    </div>
+                    <p className={`font-body-lg text-body-lg break-words ${bad ? "text-on-error-container" : "text-on-surface"}`}>
+                      <Summary text={e.summary} />
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* A wide screen, which is the officer's website. */}
+            <table className="hidden w-full text-left sm:table">
+              <thead className="border-b border-outline-variant bg-surface-container-low font-label-md text-label-md text-on-surface-variant">
                 <tr>
-                  <th className="px-5 py-2.5 font-medium">{t("colKind")}</th>
-                  <th className="px-3 py-2.5 font-medium">{t("colWhat")}</th>
-                  <th className="px-5 py-2.5 font-medium">{t("colDay")}</th>
+                  <th className="px-space-lg py-space-sm font-medium">{t("colKind")}</th>
+                  <th className="px-space-md py-space-sm font-medium">{t("colWhat")}</th>
+                  <th className="px-space-lg py-space-sm font-medium">{t("colDay")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant">
                 {entries.map((e) => {
                   const bad = flagged.has(e.chainIndex);
                   return (
-                    <tr key={e.id} className={bad ? "bg-rose-50" : undefined}>
-                      <td className="px-5 py-2.5">
+                    <tr key={e.id} className={bad ? "bg-error-container" : undefined}>
+                      <td className="px-space-lg py-space-sm">
                         <RecordTypeBadge type={e.recordType} />
                       </td>
-                      <td className="px-3 py-2.5">
-                        <p className={bad ? "font-medium text-rose-800" : "text-slate-800"}>
-                          {e.summary}
+                      <td className="px-space-md py-space-sm">
+                        <p className={`font-body-lg text-body-lg ${bad ? "text-on-error-container" : "text-on-surface"}`}>
+                          <Summary text={e.summary} />
                         </p>
                       </td>
-                      <td className="px-5 py-2.5 text-xs whitespace-nowrap text-slate-500">
+                      <td className="px-space-lg py-space-sm font-label-sm text-label-sm whitespace-nowrap text-on-surface-variant">
                         {formatDate(e.createdAt)}
                       </td>
                     </tr>
@@ -132,7 +175,7 @@ export default function LedgerView() {
                 })}
               </tbody>
             </table>
-          </div>
+          </>
         )}
       </Card>
     </div>

@@ -98,8 +98,10 @@ export default function DigitBoxes({
           onKeyDown={(e) => keyDown(i, e)}
           onFocus={(e) => e.target.select()}
           // Six boxes share the width on a narrow phone rather than running off
-          // it, but stop at a finger's width (48px) and at the design's 56px.
-          className={`h-[var(--size-digit-box)] min-w-[var(--size-touch)] max-w-[var(--size-digit-box)] flex-1 rounded-xl border-0 text-center font-stat-callout text-stat-callout text-on-surface caret-primary ring-1 ring-inset ring-outline focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary focus:outline-none disabled:text-on-surface-variant ${
+          // it. On a 320px phone each is about 41px wide, under the 48px
+          // finger floor, but still 56px tall, which is the side a thumb lands
+          // on. They stop growing at the design's 56px.
+          className={`h-[var(--size-digit-box)] min-w-0 max-w-[var(--size-digit-box)] flex-1 rounded-xl border-0 text-center font-stat-callout text-stat-callout text-on-surface caret-primary ring-1 ring-inset ring-outline focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary focus:outline-none disabled:text-on-surface-variant ${
             value[i] ? "bg-surface-container-high" : "bg-surface-container-lowest"
           }`}
         />

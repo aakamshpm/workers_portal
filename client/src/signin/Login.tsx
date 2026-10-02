@@ -7,6 +7,7 @@ import Icon from "../shared/components/Icon";
 import {
   LanguagePicker,
   isLanguage,
+  stateName,
   useT,
   type Language,
 } from "../shared/i18n";
@@ -43,17 +44,6 @@ const FIRST_AFTER_PHONE: Record<Flow, Step> = {
 function digitsOf(s: string) {
   return s.replace(/\D/g, "").slice(-10);
 }
-
-/** Home states as the server names them, and the key of each name in the dictionaries. */
-const STATE_KEY: Record<string, MessageKey> = {
-  "West Bengal": "stateWestBengal",
-  Bihar: "stateBihar",
-  "Uttar Pradesh": "stateUttarPradesh",
-  Jharkhand: "stateJharkhand",
-  Assam: "stateAssam",
-  Odisha: "stateOdisha",
-  Kerala: "stateKerala",
-};
 
 /**
  * The page's own sentence for each error code (docs/contracts/auth.md,
@@ -408,7 +398,7 @@ export default function Login({
             {states.map((s) => (
               <li key={s.state}>
                 <ChoiceRow
-                  label={STATE_KEY[s.state] ? t(STATE_KEY[s.state]!) : s.state}
+                  label={stateName(t, s.state)}
                   selected={homeState === s.state}
                   onChoose={() => {
                     setHomeState(s.state);

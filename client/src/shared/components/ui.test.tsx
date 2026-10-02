@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { Button, Card, ChoiceRow, EmptyState, Field, Note, TextField } from "./ui";
+import { Button, Card, ChoiceRow, EmptyState, Field, Note, PhoneLink, RecordTypeBadge, TextField, formatPhone } from "./ui";
+import { I18nProvider, DICTIONARIES } from "../i18n";
 
 /**
  * The primitives every screen is built from (ADR-0019).
@@ -434,5 +435,58 @@ describe("ChoiceRow", () => {
     render(<ChoiceRow label="Assam" disabled onChoose={chose} />);
     screen.getByRole("button").click();
     expect(chose).not.toHaveBeenCalled();
+  });
+});
+
+describe("formatPhone", () => {
+  // A phone number that breaks over two lines reads as two numbers, and a
+  // worker copying it onto paper writes down half of it.
+  it("joins the two halves with a space that never breaks", () => {
+    expect(formatPhone("9123456780")).toBe("91234\u00a056780");
+  });
+
+  it("leaves anything that is not 10 digits as it was", () => {
+    expect(formatPhone("0484234567")).toBe("04842\u00a034567");
+    expect(formatPhone("12345")).toBe("12345");
+  });
+});
+
+describe("PhoneLink", () => {
+  it("dials the number with the country code", () => {
+    render(<PhoneLink phone="9000010001" />);
+    expect(screen.getByRole("link").getAttribute("href")).toBe("tel:+919000010001");
+  });
+
+  it("is tall enough for a finger and never breaks over two lines", () => {
+    render(<PhoneLink phone="9000010001" />);
+    const cls = screen.getByRole("link").className;
+    expect(cls).toContain("min-h-[var(--size-touch)]");
+    expect(cls).toContain("whitespace-nowrap");
+  });
+
+  it("writes no colour outside the theme", () => {
+    const { container } = render(<PhoneLink phone="9000010001" />);
+    expect(container.innerHTML).not.toMatch(/slate-|rose-|emerald-|amber-|sky-/);
+  });
+});
+
+describe("RecordTypeBadge", () => {
+  it("is in the worker's language in his app", () => {
+    render(
+      <I18nProvider initial="ml">
+        <RecordTypeBadge type="WORK" />
+      </I18nProvider>,
+    );
+    expect(screen.getByText(DICTIONARIES.ml.recWork)).toBeTruthy();
+  });
+
+  it("keeps the longer English label in the contractor and officer apps", () => {
+    render(<RecordTypeBadge type="ACCEPT" />);
+    expect(screen.getByText("Worker said yes")).toBeTruthy();
+  });
+
+  it("writes no colour outside the theme", () => {
+    const { container } = render(<RecordTypeBadge type="DISPUTE" />);
+    expect(container.innerHTML).not.toMatch(/slate-|rose-|emerald-|amber-|sky-|indigo-|lime-|teal-/);
   });
 });

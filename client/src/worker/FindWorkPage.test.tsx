@@ -272,3 +272,39 @@ describe("FindWorkPage", () => {
     expect(listings.textContent).toMatch(/not job offers/i);
   });
 });
+
+/**
+ * The look of Find Work on a phone (design W5, ADR-0019).
+ *
+ * What these tests guarantee: "Use my location" is the theme's primary button,
+ * not the old black one; each phone number is a link a finger can hit that
+ * never breaks over two lines; and nothing uses a colour outside the theme.
+ */
+describe("FindWorkPage on a phone", () => {
+  it("uses the theme's own primary button for Use my location", async () => {
+    mocked.discoveryMe.mockResolvedValue(NEVER_OPTED_IN);
+    render(<FindWorkPage />);
+    const button = await screen.findByRole("button", { name: /use my location/i });
+    expect(button.className).toContain("bg-primary-container");
+  });
+
+  it("makes every phone number a finger-sized link that stays on one line", async () => {
+    mocked.discoveryMe.mockResolvedValue(OPTED_IN);
+    mocked.nearbyWork.mockResolvedValue(RESULTS);
+    render(<FindWorkPage />);
+    const links = await screen.findAllByRole("link");
+    expect(links).toHaveLength(2);
+    for (const a of links) {
+      expect(a.className).toContain("min-h-[var(--size-touch)]");
+      expect(a.className).toContain("whitespace-nowrap");
+    }
+  });
+
+  it("writes no colour outside the theme", async () => {
+    mocked.discoveryMe.mockResolvedValue(OPTED_IN);
+    mocked.nearbyWork.mockResolvedValue(RESULTS);
+    const { container } = render(<FindWorkPage />);
+    await screen.findAllByRole("link");
+    expect(container.innerHTML).not.toMatch(/slate-|rose-|emerald-|amber-|sky-/);
+  });
+});

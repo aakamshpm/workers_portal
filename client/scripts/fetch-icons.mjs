@@ -45,6 +45,7 @@ const ICONS = [
   { name: "domain", why: "a business in the directory" },
   { name: "engineering", why: "a contractor" },
   { name: "error", why: "the server refused the action", fill: true },
+  { name: "expand_more", why: "a list that opens, such as the language list" },
   { name: "gavel", why: "a complaint, and the officer's decision" },
   { name: "groups", why: "several workers" },
   { name: "info", why: "a note that explains, not warns" },
@@ -61,6 +62,7 @@ const ICONS = [
   { name: "progress_activity", why: "waiting for the server" },
   { name: "receipt_long", why: "the record list" },
   { name: "schedule", why: "waiting for the other side to answer" },
+  { name: "support_agent", why: "the Ask for help tab" },
   { name: "search", why: "search for a town, a name" },
   { name: "send", why: "send the offer, send the code" },
   { name: "shield", why: "a warning about keeping the PIN secret" },
@@ -68,6 +70,7 @@ const ICONS = [
   { name: "verified_user", why: "a checked record" },
   { name: "visibility", why: "see the digits that are hidden" },
   { name: "warning", why: "the worker says this row is wrong", fill: true },
+  { name: "work", why: "the Find work tab" },
 ];
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");

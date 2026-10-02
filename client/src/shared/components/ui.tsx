@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 import type { Evidence } from "../types";
 import { useT } from "../i18n";
+import type { MessageKey } from "../i18n/en";
 import Icon, { type IconName } from "./Icon";
 
 /** Money, as an Indian wage slip would show it. */
@@ -41,9 +42,14 @@ export function formatDays(days: number): string {
   return Number.isInteger(days) ? String(days) : days.toFixed(1);
 }
 
+/**
+ * A 10-digit number as two groups of five, joined by a no-break space
+ * (U+00A0). With an ordinary space the browser may put the two halves on two
+ * lines, which reads as two numbers.
+ */
 export function formatPhone(digits: string): string {
   if (!digits || digits.length !== 10) return digits;
-  return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  return `${digits.slice(0, 5)}\u00a0${digits.slice(5)}`;
 }
 
 /** A full record code is 64 characters, too wide for a table cell. */
@@ -140,16 +146,22 @@ export function Button({
   icon,
   disabled,
   busy = false,
+  full = false,
   type = "button",
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  variant?: "primary" | "secondary" | "danger" | "danger-tonal" | "ghost";
   size?: "page" | "md" | "dense";
   /** A mark beside the label. Decoration, because the label already says it. */
   icon?: IconName;
   disabled?: boolean;
   busy?: boolean;
+  /**
+   * Fill the width it is given. Two answers side by side in a two-column grid
+   * are then the same size, so neither looks like the one to choose.
+   */
+  full?: boolean;
   type?: "button" | "submit";
 }) {
   const variants = {
@@ -158,6 +170,10 @@ export function Button({
     secondary:
       "bg-surface-container-high text-primary hover:bg-surface-container-highest disabled:text-on-surface-variant",
     danger: "bg-error text-on-error hover:bg-on-error-container disabled:bg-outline-variant",
+    // Saying a record is wrong, before the answer is sent (design W1). Tonal,
+    // so it sits beside "Yes, correct" at the same weight.
+    "danger-tonal":
+      "bg-error-container text-on-error-container hover:bg-error-container/80 disabled:text-on-surface-variant",
     ghost: "text-primary hover:bg-surface-container disabled:text-on-surface-variant",
   };
   const sizes = {
@@ -173,7 +189,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled || busy}
       {...(busy ? { "aria-busy": true } : {})}
-      className={`inline-flex items-center justify-center gap-space-sm rounded-xl transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]}`}
+      className={`inline-flex items-center justify-center gap-space-sm rounded-xl py-space-xs text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${full ? "w-full" : ""}`}
     >
       {busy ? (
         <Icon name="progress_activity" spin />
@@ -332,7 +348,7 @@ export function TextField({
  * box for a screen reader.
  */
 export const inputClass =
-  "w-full min-h-[var(--size-control)] rounded-xl border-0 bg-surface-container-low px-space-md font-body-lg text-body-lg text-on-surface placeholder:text-on-surface-variant focus:bg-surface-container-lowest focus:ring-2 focus:ring-inset focus:ring-primary focus:outline-none";
+  "w-full min-w-0 min-h-[var(--size-control)] rounded-xl border-0 bg-surface-container-lowest px-space-md py-space-sm font-body-lg text-body-lg text-on-surface ring-1 ring-inset ring-outline placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary focus:outline-none";
 
 /**
  * One answer in a short list, such as the home states on the sign-in page.
@@ -487,139 +503,80 @@ export function InfoNote({ children }: { children: ReactNode }) {
 }
 
 /** The state of an offer. */
+/**
+ * The five colours a badge may take. Every badge in the three apps uses one of
+ * these, so "agreed" and "disputed" look the same on every screen.
+ */
+const TONE = {
+  good: "bg-secondary-container text-on-secondary-container",
+  waiting: "bg-surface-container-high text-on-surface",
+  bad: "bg-error-container text-on-error-container",
+  neutral: "bg-surface-container text-on-surface-variant",
+  info: "bg-tertiary-container text-on-tertiary-container",
+} as const;
+type Tone = keyof typeof TONE;
+
+/** A short status word. It never wraps, because a badge broken over two lines reads as two badges. */
+function Badge({ tone, title, children }: { tone: Tone; title?: string; children: ReactNode }) {
+  return (
+    <span
+      {...(title ? { title } : {})}
+      className={`inline-flex items-center rounded-full px-space-sm py-0.5 whitespace-nowrap font-label-md text-label-md ${TONE[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function OfferBadge({ status }: { status: string }) {
-  // English outside the worker app, which is the only app with a language provider.
   const { t } = useT();
-  const map: Record<string, { label: string; cls: string }> = {
-    PENDING: { label: t("offerPending"), cls: "bg-amber-50 text-amber-700 ring-amber-200" },
-    ACCEPTED: { label: t("offerAccepted"), cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-    DECLINED: { label: t("offerDeclined"), cls: "bg-slate-100 text-slate-600 ring-slate-200" },
-    CANCELLED: { label: t("offerCancelled"), cls: "bg-slate-100 text-slate-600 ring-slate-200" },
+  const map: Record<string, { label: string; tone: Tone }> = {
+    PENDING: { label: t("offerPending"), tone: "waiting" },
+    ACCEPTED: { label: t("offerAccepted"), tone: "good" },
+    DECLINED: { label: t("offerDeclined"), tone: "neutral" },
+    CANCELLED: { label: t("offerCancelled"), tone: "neutral" },
   };
-  const it = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600 ring-slate-200" };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${it.cls}`}
-    >
-      {it.label}
-    </span>
-  );
+  const it = map[status] ?? { label: status, tone: "neutral" as Tone };
+  return <Badge tone={it.tone}>{it.label}</Badge>;
 }
 
-/**
- * Whether the worker has agreed to a record.
- *
- * The wording matters. "Waiting" is not a neutral state - it means one person
- * wrote a number and nobody has checked it - so the label says so.
- */
 export function ConfirmBadge({ state }: { state: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    CONFIRMED: {
-      label: "Both agree",
-      cls: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    },
-    WAITING: {
-      label: "Worker has not checked this",
-      cls: "bg-amber-50 text-amber-700 ring-amber-200",
-    },
-    DISPUTED: { label: "Worker says it is wrong", cls: "bg-rose-50 text-rose-700 ring-rose-200" },
+  const map: Record<string, { label: string; tone: Tone }> = {
+    CONFIRMED: { label: "Both agree", tone: "good" },
+    WAITING: { label: "Worker has not checked this", tone: "waiting" },
+    DISPUTED: { label: "Worker says it is wrong", tone: "bad" },
   };
-  const it = map[state] ?? { label: state, cls: "bg-slate-100 text-slate-600 ring-slate-200" };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${it.cls}`}
-    >
-      {it.label}
-    </span>
-  );
+  const it = map[state] ?? { label: state, tone: "neutral" as Tone };
+  return <Badge tone={it.tone}>{it.label}</Badge>;
 }
 
-/**
- * How strongly a payment can be shown to have happened.
- *
- * Five honest levels rather than a tick or a cross, because the difference
- * between "the bank has a record" and "the contractor says so" is the difference
- * between a provable and an unprovable dispute.
- */
 export function EvidenceBadge({ evidence }: { evidence: Evidence }) {
-  const map: Record<Evidence, { label: string; cls: string; title: string }> = {
-    strong: {
-      label: "Bank has a record",
-      cls: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-      title: "Paid by UPI or bank. The bank has a record.",
-    },
-    good: {
-      label: "Code used when paid",
-      cls: "bg-sky-50 text-sky-800 ring-sky-200",
-      title: "The worker read out a code when he was paid.",
-    },
-    weak: {
-      label: "Worker agreed later",
-      cls: "bg-amber-50 text-amber-800 ring-amber-200",
-      title: "The worker agreed some days later.",
-    },
-    none: {
-      label: "Nothing to show",
-      cls: "bg-slate-100 text-slate-600 ring-slate-300",
-      title: "Only the contractor says this was paid.",
-    },
-    disputed: {
-      label: "Worker says he got nothing",
-      cls: "bg-rose-50 text-rose-800 ring-rose-200",
-      title: "The worker says this money never reached him.",
-    },
+  const map: Record<Evidence, { label: string; tone: Tone; title: string }> = {
+    strong: { label: "Bank has a record", tone: "good", title: "Paid by UPI or bank. The bank has a record." },
+    good: { label: "Code used when paid", tone: "info", title: "The worker read out a code when he was paid." },
+    weak: { label: "Worker agreed later", tone: "waiting", title: "The worker agreed some days later." },
+    none: { label: "Nothing to show", tone: "neutral", title: "Only the contractor says this was paid." },
+    disputed: { label: "Worker says he got nothing", tone: "bad", title: "The worker says this money never reached him." },
   };
   const it = map[evidence];
   return (
-    <span
-      title={it.title}
-      className={`inline-flex cursor-help items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${it.cls}`}
-    >
+    <Badge tone={it.tone} title={it.title}>
       {it.label}
-    </span>
+    </Badge>
   );
 }
 
-/**
- * The same complaint status, worded for two different readers.
- *
- * A migrant worker reading his own complaint needs the shortest true sentence.
- * A labour officer is a government professional working a caseload, and
- * worker-level wording on her screen reads as if the software does not take her
- * job seriously. So the status carries two labels and the caller says which
- * reader it is for.
- */
-const COMPLAINT_STATUS: Record<string, { plain: string; official: string; cls: string }> = {
-  OPEN: {
-    plain: "Waiting for the officer",
-    official: "Awaiting review",
-    cls: "bg-amber-50 text-amber-700 ring-amber-200",
-  },
+const COMPLAINT_STATUS: Record<string, { plain: string; official: string; tone: Tone }> = {
+  OPEN: { plain: "Waiting for the officer", official: "Awaiting review", tone: "waiting" },
   AWAITING_EMPLOYER: {
     plain: "Contractor asked to answer",
     official: "Awaiting contractor's response",
-    cls: "bg-sky-50 text-sky-700 ring-sky-200",
+    tone: "info",
   },
-  RESOLVED: {
-    plain: "Worker was right",
-    official: "Upheld",
-    cls: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  },
-  REJECTED: {
-    plain: "Records do not agree",
-    official: "Rejected",
-    cls: "bg-rose-50 text-rose-700 ring-rose-200",
-  },
-  ESCALATED: {
-    plain: "Sent to a higher office",
-    official: "Escalated",
-    cls: "bg-violet-50 text-violet-700 ring-violet-200",
-  },
-  CLOSED_UNPROVEN: {
-    plain: "Nobody could prove it",
-    official: "Closed, unproven",
-    cls: "bg-slate-100 text-slate-600 ring-slate-300",
-  },
+  RESOLVED: { plain: "Worker was right", official: "Upheld", tone: "good" },
+  REJECTED: { plain: "Records do not agree", official: "Rejected", tone: "bad" },
+  ESCALATED: { plain: "Sent to a higher office", official: "Escalated", tone: "info" },
+  CLOSED_UNPROVEN: { plain: "Nobody could prove it", official: "Closed, unproven", tone: "neutral" },
 };
 
 export function ComplaintBadge({
@@ -630,57 +587,78 @@ export function ComplaintBadge({
   audience?: "plain" | "official";
 }) {
   const found = COMPLAINT_STATUS[status];
-  const it = found
-    ? { label: audience === "official" ? found.official : found.plain, cls: found.cls }
-    : { label: status, cls: "bg-slate-100 text-slate-600 ring-slate-200" };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${it.cls}`}
-    >
-      {it.label}
-    </span>
-  );
+  if (!found) return <Badge tone="neutral">{status}</Badge>;
+  return <Badge tone={found.tone}>{audience === "official" ? found.official : found.plain}</Badge>;
 }
 
-/** Colour-coded label for the six kinds of record in the chain. */
+const RECORD_TONE: Record<string, Tone> = {
+  OFFER: "info",
+  ACCEPT: "good",
+  WORK: "waiting",
+  PAYMENT: "waiting",
+  CONFIRM: "good",
+  DISPUTE: "bad",
+  EMPLOYER_NOTE: "neutral",
+};
+
+const RECORD_KEY: Record<string, MessageKey> = {
+  OFFER: "recOffer",
+  ACCEPT: "recAccept",
+  WORK: "recWork",
+  PAYMENT: "recPayment",
+  CONFIRM: "recConfirm",
+  DISPUTE: "recDispute",
+  EMPLOYER_NOTE: "recEmployerNote",
+};
+
+/** The contractor and officer apps read about the worker, so their labels name him. */
+const RECORD_ENGLISH: Record<string, string> = {
+  OFFER: "Work offered",
+  ACCEPT: "Worker said yes",
+  WORK: "Work done",
+  PAYMENT: "Money paid",
+  CONFIRM: "Worker agreed",
+  DISPUTE: "Worker said wrong",
+  EMPLOYER_NOTE: "Employer answered",
+};
+
+/**
+ * What kind of record a line is. In the worker app it is in his language,
+ * with the same words as the filters above the list (ADR-0015). Elsewhere it
+ * is English. `setLanguage` exists only inside the worker's language provider.
+ */
 export function RecordTypeBadge({ type }: { type: string }) {
-  const styles: Record<string, string> = {
-    OFFER: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-    ACCEPT: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    WORK: "bg-sky-50 text-sky-700 ring-sky-200",
-    PAYMENT: "bg-teal-50 text-teal-700 ring-teal-200",
-    CONFIRM: "bg-lime-50 text-lime-700 ring-lime-200",
-    DISPUTE: "bg-rose-50 text-rose-700 ring-rose-200",
-    EMPLOYER_NOTE: "bg-slate-100 text-slate-700 ring-slate-300",
-  };
-  const labels: Record<string, string> = {
-    OFFER: "Work offered",
-    ACCEPT: "Worker said yes",
-    WORK: "Work done",
-    PAYMENT: "Money paid",
-    CONFIRM: "Worker agreed",
-    DISPUTE: "Worker said wrong",
-    EMPLOYER_NOTE: "Employer answered",
-  };
-  return (
-    <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-        styles[type] ?? "bg-slate-50 text-slate-600 ring-slate-200"
-      }`}
-    >
-      {labels[type] ?? type}
-    </span>
-  );
+  const { t, setLanguage } = useT();
+  const key = RECORD_KEY[type];
+  const label = setLanguage && key ? t(key) : (RECORD_ENGLISH[type] ?? type);
+  return <Badge tone={RECORD_TONE[type] ?? "neutral"}>{label}</Badge>;
 }
 
-/** A tap-to-dial link. The system never places calls; it opens the officer's dialler. */
-export function PhoneLink({ phone, children }: { phone: string; children?: ReactNode }) {
+/**
+ * A phone number the reader can tap to call.
+ *
+ * A mobile number is dialled with +91. `asWritten` is for a business listing,
+ * whose number is often a landline with its own area code, so it is shown and
+ * dialled exactly as it is stored.
+ *
+ * The link is a finger's height, and the number never breaks over two lines.
+ */
+export function PhoneLink({
+  phone,
+  asWritten = false,
+  children,
+}: {
+  phone: string;
+  asWritten?: boolean;
+  children?: ReactNode;
+}) {
   return (
     <a
-      href={`tel:+91${phone}`}
-      className="font-medium text-sky-700 underline decoration-sky-300 hover:text-sky-900"
+      href={asWritten ? `tel:${phone}` : `tel:+91${phone}`}
+      className="inline-flex min-h-[var(--size-touch)] items-center gap-space-xs whitespace-nowrap font-body-lg-medium text-body-lg-medium text-primary underline decoration-outline-variant underline-offset-4 hover:decoration-primary"
     >
-      {children ?? formatPhone(phone)}
+      <Icon name="call" size={18} />
+      {children ?? (asWritten ? phone : formatPhone(phone))}
     </a>
   );
 }

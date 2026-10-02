@@ -187,6 +187,7 @@
   --size-control: 48px; /* an input, and an ordinary button */
   --size-digit-box: 56px; /* one box of a PIN or a code */
   --size-header: 56px; /* the fixed bar at the top */
+  --size-bottom-nav: 64px; /* the worker app's section bar at the foot of the screen */
 
   /*
    * A row action on the officer website. That app is a website and never

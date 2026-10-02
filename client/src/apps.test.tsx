@@ -120,7 +120,7 @@ describe("each app shows only its own tabs", () => {
   }
 
   it("worker: his work, finding work, help, records. No pay, no complaint desk", () => {
-    expect(tabsOf(WorkerApp, "WORKER")).toEqual(["My work", "Find work", "Ask for help", "All records"]);
+    expect(tabsOf(WorkerApp, "WORKER")).toEqual(["My work", "Find work", "Ask for help", "Records"]);
   });
 
   it("contractor: his workers, paying, records. No find work, no complaint desk", () => {

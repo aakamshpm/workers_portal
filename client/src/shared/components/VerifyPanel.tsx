@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { api } from "../api";
 import type { VerificationResult } from "../types";
-import { Button, RecordTypeBadge } from "./ui";
+import { useT } from "../i18n";
+import Icon from "./Icon";
+import { Button, Note, RecordTypeBadge } from "./ui";
 
 /**
  * The integrity check and its result.
@@ -28,6 +30,8 @@ export default function VerifyPanel({
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useT();
+  const headingId = useId();
 
   async function run() {
     setBusy(true);
@@ -37,167 +41,109 @@ export default function VerifyPanel({
       setResult(r);
       onVerified?.(r);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The check could not run. Please try again.");
+      setError(err instanceof Error ? err.message : t("verifyFailed"));
     } finally {
       setBusy(false);
     }
   }
 
+  const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-4">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">Has anyone changed anything?</h2>
-          <p className="mt-0.5 max-w-2xl text-xs text-slate-500">
-            Checks that no number has changed since it was written down.
-          </p>
+    <section
+      aria-labelledby={headingId}
+      className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg shadow-sm"
+    >
+      <div className="flex items-start gap-space-md">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+          <Icon name="verified_user" size={22} />
+        </span>
+        <div className="flex min-w-0 flex-col gap-space-xs">
+          <h2 id={headingId} className="font-headline-sm text-headline-sm text-on-surface">
+            {t("verifyTitle")}
+          </h2>
+          <p className="font-label-md text-label-md text-on-surface-variant">{t("verifyDescription")}</p>
         </div>
-        <Button onClick={run} disabled={busy}>
-          {busy ? "Checking…" : "Check all records"}
-        </Button>
       </div>
 
-      {error && (
-        <div className="border-t border-slate-200 px-5 py-3">
-          <p className="text-sm text-rose-700">{error}</p>
-        </div>
-      )}
+      <Button size="page" icon="search" busy={busy} onClick={run}>
+        {busy ? t("verifyChecking") : t("verifyButton")}
+      </Button>
 
-      {result && (
-        <div className="border-t border-slate-200 p-5">
-          {result.valid ? (
-            <div className="rounded-md bg-emerald-50 p-4 ring-1 ring-inset ring-emerald-200">
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="grid size-5 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white"
+      {error && <Note tone="error">{error}</Note>}
+
+      {result &&
+        (result.valid ? (
+          <Note tone="success">
+            {t("verifyAllSame", { count: result.entriesChecked })} {t("verifyCheckedAt", { time: time(result.checkedAt) })}
+          </Note>
+        ) : result.failures.length === 0 ? (
+          // Every problem is in records this reader may not see.
+          <Note tone="warning">
+            <strong className="font-semibold">{t("verifyYoursSame")}</strong>{" "}
+            {t("verifyHiddenOnly", { count: result.hiddenFailures })} {t("verifyCheckedAt", { time: time(result.checkedAt) })}
+          </Note>
+        ) : (
+          <div role="alert" className="flex flex-col gap-space-md rounded-xl bg-error-container p-space-lg text-on-error-container">
+            <p className="flex items-center gap-space-sm font-body-lg-bold text-body-lg-bold">
+              <Icon name="warning" filled className="shrink-0" />
+              {t("verifyChanged", { count: result.failures.length })}
+            </p>
+            {result.hiddenFailures > 0 && (
+              <p className="font-body-lg text-body-lg">{t("verifyAlsoHidden", { count: result.hiddenFailures })}</p>
+            )}
+
+            <ul className="flex flex-col gap-space-sm">
+              {result.failures.map((f, i) => (
+                <li
+                  key={`${f.entryId}-${f.problem}-${i}`}
+                  className="flex flex-col gap-space-sm rounded-xl bg-surface-container-lowest p-space-md text-on-surface"
                 >
-                  ✓
-                </span>
-                <p className="text-sm font-semibold text-emerald-900">
-                  Nothing has been changed. All {result.entriesChecked} lines are the same.
-                </p>
-              </div>
-              <p className="mt-2 text-xs text-emerald-700">
-                We checked at {new Date(result.checkedAt).toLocaleTimeString("en-IN")}
-              </p>
-            </div>
-          ) : result.failures.length === 0 ? (
-            // Every problem is in records this reader may not see.
-            <div className="rounded-md bg-amber-50 p-4 ring-1 ring-inset ring-amber-200">
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="grid size-5 place-items-center rounded-full bg-amber-600 text-xs font-bold text-white"
-                >
-                  !
-                </span>
-                <p className="text-sm font-semibold text-amber-900">
-                  Your own records are unchanged.
-                </p>
-              </div>
-              <p className="mt-1.5 text-sm text-amber-800">
-                We found {result.hiddenFailures} {result.hiddenFailures === 1 ? "problem" : "problems"}{" "}
-                in records that are not yours, so we cannot show them to you. The labour office can
-                see them.
-              </p>
-              <p className="mt-2 text-xs text-amber-700">
-                We checked at {new Date(result.checkedAt).toLocaleTimeString("en-IN")}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-md bg-rose-50 p-4 ring-1 ring-inset ring-rose-200">
-              <div className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="grid size-5 place-items-center rounded-full bg-rose-600 text-xs font-bold text-white"
-                >
-                  !
-                </span>
-                <p className="text-sm font-semibold text-rose-900">
-                  Someone changed {result.failures.length} of your line
-                  {result.failures.length === 1 ? "" : "s"}
-                </p>
-              </div>
-              {result.hiddenFailures > 0 && (
-                <p className="mt-1.5 text-sm text-rose-800">
-                  There {result.hiddenFailures === 1 ? "is" : "are"} also {result.hiddenFailures}{" "}
-                  {result.hiddenFailures === 1 ? "problem" : "problems"} in records that are not
-                  yours. The labour office can see them.
-                </p>
-              )}
+                  <div>
+                    <RecordTypeBadge type={f.recordType} />
+                  </div>
+                  <p className="font-body-lg text-body-lg break-words">{f.summary}</p>
 
-              <ul className="mt-3 space-y-3">
-                {result.failures.map((f, i) => (
-                  <li
-                    key={`${f.entryId}-${f.problem}-${i}`}
-                    className="rounded-md bg-white p-3 ring-1 ring-inset ring-rose-200"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <RecordTypeBadge type={f.recordType} />
-                    </div>
-
-                    <p className="mt-1.5 text-sm text-slate-700">{f.summary}</p>
-
-                    {/* What actually changed, in plain language. This table is
-                        the point of the whole panel. */}
-                    {f.changedFields && f.changedFields.length > 0 && (
-                      <table className="mt-2 w-full text-left text-xs">
-                        <thead className="text-slate-500">
-                          <tr>
-                            <th className="pr-3 pb-1 font-medium">What</th>
-                            <th className="pr-3 pb-1 font-medium">First written as</th>
-                            <th className="pb-1 font-medium">It now says</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {f.changedFields.map((c) => (
-                            <tr key={c.field} className="border-t border-slate-100">
-                              <td className="py-1 pr-3 text-slate-700">{c.field}</td>
-                              <td className="tnum py-1 pr-3 font-medium text-emerald-700">
-                                {c.original}
-                              </td>
-                              <td className="tnum py-1 font-medium text-rose-700">{c.current}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-
-                    {(!f.changedFields || f.changedFields.length === 0) && (
-                      <p className="mt-1.5 text-sm text-slate-600">{f.detail}</p>
-                    )}
-
-                    {/* The raw codes stay available, but folded away, for
-                        anyone who needs to check them by hand. */}
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">
-                        Show the security codes
-                      </summary>
-                      <dl className="mt-1.5 space-y-1 text-xs">
-                        <div className="flex gap-2">
-                          <dt className="w-40 shrink-0 text-slate-500">The code it should have</dt>
-                          <dd className="tnum break-all font-mono text-emerald-700">
-                            {f.expected}
+                  {/* What actually changed, one line per field. This list is
+                      the point of the whole panel. */}
+                  {f.changedFields && f.changedFields.length > 0 ? (
+                    <dl className="flex flex-col gap-space-sm">
+                      {f.changedFields.map((c) => (
+                        <div key={c.field} className="rounded-lg bg-surface-container-low p-space-sm">
+                          <dt className="font-label-md text-label-md text-on-surface-variant">{c.field}</dt>
+                          <dd className="font-body-lg text-body-lg break-words">
+                            {t("verifyFirstWritten")}: <span className="font-semibold tabular-nums">{c.original}</span>
+                          </dd>
+                          <dd className="font-body-lg text-body-lg break-words text-error">
+                            {t("verifyNowSays")}: <span className="font-semibold tabular-nums">{c.current}</span>
                           </dd>
                         </div>
-                        <div className="flex gap-2">
-                          <dt className="w-40 shrink-0 text-slate-500">The code saved with it</dt>
-                          <dd className="tnum break-all font-mono text-rose-700">{f.found}</dd>
-                        </div>
-                      </dl>
-                    </details>
-                  </li>
-                ))}
-              </ul>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="font-body-lg text-body-lg text-on-surface-variant">{f.detail}</p>
+                  )}
 
-              <p className="mt-3 text-xs text-rose-700">
-                We checked at {new Date(result.checkedAt).toLocaleTimeString("en-IN")}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+                  {/* The raw codes stay available, but folded away, for
+                      anyone who needs to check them by hand. */}
+                  <details>
+                    <summary className="flex min-h-[var(--size-touch)] cursor-pointer items-center font-label-md text-label-md text-primary">
+                      {t("verifyShowCodes")}
+                    </summary>
+                    <dl className="flex flex-col gap-space-xs font-label-sm text-label-sm">
+                      <dt className="text-on-surface-variant">{t("verifyCodeExpected")}</dt>
+                      <dd className="font-mono break-all">{f.expected}</dd>
+                      <dt className="text-on-surface-variant">{t("verifyCodeFound")}</dt>
+                      <dd className="font-mono break-all text-error">{f.found}</dd>
+                    </dl>
+                  </details>
+                </li>
+              ))}
+            </ul>
+
+            <p className="font-label-sm text-label-sm">{t("verifyCheckedAt", { time: time(result.checkedAt) })}</p>
+          </div>
+        ))}
+    </section>
   );
 }
