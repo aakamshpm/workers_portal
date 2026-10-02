@@ -11,3 +11,4 @@ generated/
 *.log
 tsconfig.tsbuildinfo
 context.md
+.playwright-mcp/

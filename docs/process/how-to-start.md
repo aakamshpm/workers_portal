@@ -32,6 +32,17 @@ That account has no PIN. Its owner opens `http://localhost:5173/`, taps "Forgot 
 3. Grant SMS permission, register the device, copy the API key into `server/.env`
 4. Leave that phone on and charged while sending SMS
 
+## MCP servers in `opencode.json`
+
+Both are optional. OpenCode reads the config once at start, so restart it after setting a variable.
+
+| Server | What it is for | Needs |
+|---|---|---|
+| `stitch` | Reading the Stitch design project | `export STITCH_API_KEY=...` |
+| `playwright` | An agent opens the running app in a headless browser at phone size (390×844), clicks through it and takes screenshots | `export PLAYWRIGHT_BROWSER=/path/to/chrome-or-brave`, or `npx playwright install chrome` |
+
+The Playwright server may open only `http://localhost:5173` (dev) and `http://localhost:4173` (`vite preview`). Every other site is blocked, so an agent cannot send project data anywhere through the browser. It keeps no browser profile between sessions, and its files go to `.playwright-mcp/`, which git ignores.
+
 ## Agent to use
 
 | Person | Agent | Switch |

@@ -15,6 +15,26 @@
         "X-Goog-Api-Key": "{env:STITCH_API_KEY}"
       },
       "enabled": true
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@0.0.83",
+        "--headless",
+        "--isolated",
+        "--viewport-size",
+        "390x844",
+        "--allowed-origins",
+        "http://localhost:5173;http://localhost:4173",
+        "--output-dir",
+        ".playwright-mcp"
+      ],
+      "environment": {
+        "PLAYWRIGHT_MCP_EXECUTABLE_PATH": "{env:PLAYWRIGHT_BROWSER}"
+      },
+      "enabled": true
     }
   }
 }
