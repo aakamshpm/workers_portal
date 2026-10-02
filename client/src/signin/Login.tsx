@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api, storeSession } from "../shared/api";
 import type { AuthUser } from "../shared/types";
 import DigitBoxes from "../shared/components/DigitBoxes";
+import AppHeader from "../shared/components/AppHeader";
+import Icon from "../shared/components/Icon";
 import {
   LanguagePicker,
   isLanguage,
@@ -9,7 +11,7 @@ import {
   type Language,
 } from "../shared/i18n";
 import type { MessageKey } from "../shared/i18n/en";
-import { Button, ErrorNote, inputClass } from "../shared/components/ui";
+import { Button, ChoiceRow, Note, TextField, formatPhone } from "../shared/components/ui";
 
 /**
  * Sign in, register, and forgot PIN. ADR-0013, ADR-0014.
@@ -179,225 +181,208 @@ export default function Login({
     reset: t("setNewPin"),
   };
 
+  /**
+   * The one question each screen asks, as its only h1 (ADR-0019). A screen
+   * reader user who jumps to the first heading hears what the screen wants.
+   * The phone screen's question is the flow itself: "Sign in", "New worker".
+   */
+  const question: Record<Step, string> = {
+    phone: title[flow],
+    pin: t("typePin"),
+    code: t("codeSent", { phone: formatPhone(digitsOf(phone)) }),
+    name: t("yourName"),
+    state: t("whichState"),
+    newPin: t("choosePin"),
+    newPinAgain: t("typePinAgain"),
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-sm items-center justify-between gap-3 px-4 py-3">
-          <h1 className="text-base font-semibold tracking-tight text-slate-900">
-            {t("appTitle")}
-          </h1>
-          <LanguagePicker />
+    <div className="flex min-h-screen flex-col bg-surface">
+      <AppHeader title={t("appTitle")}>
+        <LanguagePicker />
+      </AppHeader>
+
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-space-xl px-margin pt-space-xl pb-space-2xl">
+        <div className="flex flex-col gap-space-xs">
+          {/* After the phone screen, the flow's name sits above the question,
+              so a worker halfway through "Forgot PIN" still knows where he is. */}
+          {step !== "phone" && (
+            <p className="font-label-md text-label-md text-primary">{title[flow]}</p>
+          )}
+          <h1 className="font-headline-md text-headline-md text-on-surface">{question[step]}</h1>
         </div>
-      </header>
 
-      <main className="flex flex-1 items-start justify-center px-4 pt-8 pb-10 sm:items-center sm:pt-0">
-        <div className="w-full max-w-sm">
-          <div className="space-y-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
-              {title[flow]}
-            </h2>
+        {error && <Note tone="error">{error}</Note>}
 
-            {error && <ErrorNote message={error} />}
+        {step === "phone" && (
+          <form
+            className="flex flex-col gap-space-lg"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitPhone();
+            }}
+          >
+            <TextField
+              label={t("phoneNumber")}
+              prefix="+91"
+              type="tel"
+              numeric
+              autoComplete="tel-national"
+              autoFocus
+              value={phone}
+              onChange={setPhone}
+              placeholder={t("phonePlaceholder")}
+            />
+            <Button type="submit" size="page" busy={busy}>
+              {busy ? t("sending") : t("next")}
+              {!busy && <Icon name="arrow_forward" />}
+            </Button>
+          </form>
+        )}
 
-            {step === "phone" && (
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitPhone();
-                }}
-              >
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    {t("phoneNumber")}
-                  </span>
-                  <input
-                    className={`${inputClass} min-h-12 text-lg`}
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    autoFocus
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder={t("phonePlaceholder")}
-                  />
-                </label>
-                <Button type="submit" disabled={busy}>
-                  {busy ? t("sending") : t("next")}
-                </Button>
-              </form>
-            )}
+        {step === "pin" && (
+          <DigitBoxes
+            label={t("pinLabel")}
+            length={4}
+            value={pin}
+            onChange={setPin}
+            onComplete={signIn}
+            secret
+            autoFocus
+            disabled={busy}
+          />
+        )}
 
-            {step === "pin" && (
-              <div className="space-y-4">
-                <p className="text-center text-sm text-slate-600">
-                  {t("typePin")}
-                </p>
-                <DigitBoxes
-                  label={t("pinLabel")}
-                  length={4}
-                  value={pin}
-                  onChange={setPin}
-                  onComplete={signIn}
-                  secret
-                  autoFocus
-                  disabled={busy}
+        {step === "code" && (
+          <DigitBoxes
+            label={t("codeLabel")}
+            length={6}
+            value={code}
+            onChange={setCode}
+            onComplete={() => setStep(flow === "register" ? "name" : "newPin")}
+            autoFocus
+          />
+        )}
+
+        {step === "name" && (
+          <form
+            className="flex flex-col gap-space-lg"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (name.trim().length < 2) {
+                setError(t("nameInvalid"));
+                return;
+              }
+              setError("");
+              setStep("state");
+            }}
+          >
+            {/* The heading already asks "Your name", so the label is for a
+                screen reader only. */}
+            <TextField
+              label={t("yourName")}
+              hideLabel
+              autoComplete="name"
+              autoFocus
+              value={name}
+              onChange={setName}
+            />
+            <Button type="submit" size="page">
+              {t("next")}
+              <Icon name="arrow_forward" />
+            </Button>
+          </form>
+        )}
+
+        {step === "state" && (
+          <ul className="flex flex-col gap-space-sm">
+            {states.map((s) => (
+              <li key={s.state}>
+                <ChoiceRow
+                  label={STATE_KEY[s.state] ? t(STATE_KEY[s.state]!) : s.state}
+                  selected={homeState === s.state}
+                  onChoose={() => {
+                    setHomeState(s.state);
+                    if (isLanguage(s.language)) onHomeStateLanguage?.(s.language);
+                    setStep("newPin");
+                  }}
                 />
-              </div>
-            )}
+              </li>
+            ))}
+          </ul>
+        )}
 
-            {step === "code" && (
-              <div className="space-y-4">
-                <p className="text-center text-sm text-slate-600">
-                  {t("codeSent", { phone: digitsOf(phone) })}
-                </p>
-                <DigitBoxes
-                  label={t("codeLabel")}
-                  length={6}
-                  value={code}
-                  onChange={setCode}
-                  onComplete={() =>
-                    setStep(flow === "register" ? "name" : "newPin")
-                  }
-                  autoFocus
-                />
-              </div>
-            )}
-
-            {step === "name" && (
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (name.trim().length < 2) {
-                    setError(t("nameInvalid"));
-                    return;
-                  }
-                  setError("");
-                  setStep("state");
-                }}
-              >
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">
-                    {t("yourName")}
-                  </span>
-                  <input
-                    className={`${inputClass} min-h-12 text-lg`}
-                    autoComplete="name"
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </label>
-                <Button type="submit">{t("next")}</Button>
-              </form>
-            )}
-
-            {step === "state" && (
-              <div className="space-y-3">
-                <p className="text-sm text-slate-600">{t("whichState")}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {states.map((s) => (
-                    <button
-                      key={s.state}
-                      type="button"
-                      onClick={() => {
-                        setHomeState(s.state);
-                        if (isLanguage(s.language))
-                          onHomeStateLanguage?.(s.language);
-                        setStep("newPin");
-                      }}
-                      className="min-h-12 rounded-lg bg-white px-3 py-3 text-left text-base font-medium text-slate-800 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-                    >
-                      {STATE_KEY[s.state] ? t(STATE_KEY[s.state]!) : s.state}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {step === "newPin" && (
-              <div className="space-y-4">
-                <p className="text-center text-sm text-slate-600">
-                  {t("choosePin")}
-                </p>
-                <DigitBoxes
-                  label={t("pinLabel")}
-                  length={4}
-                  value={newPin}
-                  onChange={setNewPin}
-                  onComplete={() => setStep("newPinAgain")}
-                  secret
-                  autoFocus
-                />
-                <p className="text-center text-xs text-slate-500">
-                  {t("neverTellPin")}
-                </p>
-              </div>
-            )}
-
-            {step === "newPinAgain" && (
-              <div className="space-y-4">
-                <p className="text-center text-sm text-slate-600">
-                  {t("typePinAgain")}
-                </p>
-                <DigitBoxes
-                  label={t("pinAgainLabel")}
-                  length={4}
-                  value={newPinAgain}
-                  onChange={setNewPinAgain}
-                  onComplete={finish}
-                  secret
-                  autoFocus
-                  disabled={busy}
-                />
-              </div>
-            )}
-
-            {step !== "phone" && (
-              <button
-                type="button"
-                onClick={() => start(flow)}
-                className="block w-full text-center text-sm text-slate-500 underline"
-              >
-                {t("startAgain")}
-              </button>
-            )}
+        {step === "newPin" && (
+          <div className="flex flex-col gap-space-lg">
+            <DigitBoxes
+              label={t("pinLabel")}
+              length={4}
+              value={newPin}
+              onChange={setNewPin}
+              onComplete={() => setStep("newPinAgain")}
+              secret
+              autoFocus
+            />
+            <Note tone="warning">{t("neverTellPin")}</Note>
           </div>
+        )}
 
-          <div className="mt-5 flex flex-col items-center gap-2 text-sm">
-            {flow !== "register" && (
-              <button
-                type="button"
-                onClick={() => start("register")}
-                className="font-medium text-sky-700 underline"
-              >
-                {t("makeAccount")}
-              </button>
-            )}
-            {flow !== "reset" && (
-              <button
-                type="button"
-                onClick={() => start("reset")}
-                className="font-medium text-sky-700 underline"
-              >
-                {t("forgotPin")}
-              </button>
-            )}
-            {flow !== "signin" && (
-              <button
-                type="button"
-                onClick={() => start("signin")}
-                className="font-medium text-sky-700 underline"
-              >
-                {t("havePin")}
-              </button>
-            )}
-            <p className="mt-2 text-center text-xs text-slate-500">
-              {t("staffNote")}
-            </p>
+        {step === "newPinAgain" && (
+          <DigitBoxes
+            label={t("pinAgainLabel")}
+            length={4}
+            value={newPinAgain}
+            onChange={setNewPinAgain}
+            onComplete={finish}
+            secret
+            autoFocus
+            disabled={busy}
+          />
+        )}
+
+        {/* The digit boxes are disabled while the server answers, and without
+            this line they look broken. */}
+        {busy && step !== "phone" && (
+          <p
+            role="status"
+            className="flex items-center justify-center gap-space-sm font-body-lg-medium text-body-lg-medium text-primary"
+          >
+            <Icon name="progress_activity" spin />
+            {t("pleaseWait")}
+          </p>
+        )}
+
+        {step !== "phone" && (
+          <div className="flex justify-center">
+            <Button variant="ghost" icon="arrow_back" onClick={() => start(flow)}>
+              {t("startAgain")}
+            </Button>
           </div>
+        )}
+
+        {/* The other flows are offered only before the phone is given. After
+            that, "Start again" is the only way out, so the screen still asks
+            one thing. */}
+        {step === "phone" && (
+        <div className="flex flex-col gap-space-sm border-t border-outline-variant pt-space-lg">
+          {flow !== "register" && (
+            <Button variant="secondary" size="page" onClick={() => start("register")}>
+              {t("makeAccount")}
+            </Button>
+          )}
+          {flow !== "reset" && (
+            <Button variant="ghost" onClick={() => start("reset")}>
+              {t("forgotPin")}
+            </Button>
+          )}
+          {flow !== "signin" && (
+            <Button variant="ghost" onClick={() => start("signin")}>
+              {t("havePin")}
+            </Button>
+          )}
+          <Note tone="info">{t("staffNote")}</Note>
         </div>
+        )}
       </main>
     </div>
   );

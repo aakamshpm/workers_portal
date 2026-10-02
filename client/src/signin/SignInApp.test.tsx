@@ -329,6 +329,90 @@ describe("language", () => {
   });
 });
 
+/**
+ * ADR-0019: the sign-in page on the design system.
+ *
+ * - each screen asks one question, and that question is the page's only h1,
+ *   so a screen reader user hears what the screen wants first;
+ * - the header carries the app name and the language list on every screen;
+ * - "+91" sits beside the phone box but is not part of what is typed, so a
+ *   worker types ten digits and the server receives ten digits;
+ * - while the server checks a PIN, the page says it is waiting, because the
+ *   boxes are disabled and otherwise look broken;
+ * - nothing on the page claims a link to a government register, because
+ *   there is none.
+ */
+describe("layout", () => {
+  const heading = () => screen.getByRole("heading", { level: 1 });
+
+  it("asks one question per screen, as the page heading", async () => {
+    render(<SignInApp />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(heading().textContent).toBe(DICTIONARIES.en.signIn);
+    typePhone("9845687924");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(heading().textContent).toBe(DICTIONARIES.en.typePin);
+  });
+
+  it("names the flow above the question once the phone is given", async () => {
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    await screen.findAllByLabelText(/code digit/i);
+    expect(heading().textContent).toContain("9845687924".slice(0, 5));
+    expect(screen.getByText(DICTIONARIES.en.newWorker)).toBeTruthy();
+  });
+
+  it("keeps the app name and the language list in one header on every screen", () => {
+    render(<SignInApp />);
+    const banner = screen.getByRole("banner");
+    expect(banner.textContent).toContain(DICTIONARIES.en.appTitle);
+    expect(banner.querySelector("select")).not.toBeNull();
+    typePhone("9845687924");
+    expect(screen.getByRole("banner").querySelector("select")).not.toBeNull();
+  });
+
+  it("offers the other flows only on the phone screen", async () => {
+    // Halfway through, the only way out is "Start again". A worker typing an
+    // SMS code should not be offered "Forgot PIN?" for an account he is still
+    // making.
+    render(<SignInApp />);
+    expect(screen.getByRole("button", { name: /forgot pin/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    await screen.findAllByLabelText(/code digit/i);
+    expect(screen.queryByRole("button", { name: /forgot pin/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /have a pin/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /start again/i })).toBeTruthy();
+  });
+
+  it("shows +91 beside the phone box, outside what is typed", () => {
+    render(<SignInApp />);
+    expect(screen.getByText("+91")).toBeTruthy();
+    const box = screen.getByLabelText(/phone number/i) as HTMLInputElement;
+    expect(box.value).toBe("");
+    expect(box.getAttribute("inputmode")).toBe("numeric");
+  });
+
+  it("says it is waiting while the server checks the PIN", async () => {
+    mocked.login.mockReturnValue(new Promise(() => {}));
+    render(<SignInApp />);
+    typePhone("9845687924");
+    await typeDigits(/pin digit/i, "5739");
+    expect((await screen.findByRole("status")).textContent).toContain(DICTIONARIES.en.pleaseWait);
+  });
+
+  it("claims no link to a government register or an identity check", async () => {
+    render(<SignInApp />);
+    const claims = /national|register of|government|aadhaar|e-shram|welfare board|verified/i;
+    expect(document.body.textContent).not.toMatch(claims);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    await screen.findAllByLabelText(/code digit/i);
+    expect(document.body.textContent).not.toMatch(claims);
+  });
+});
+
 /** ADR-0013: nothing from the demo on the real sign-in page. */
 describe("no demo parts", () => {
   it("lists no accounts and mentions no shared PIN or seeded person", () => {
