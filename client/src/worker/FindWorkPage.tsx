@@ -222,85 +222,84 @@ export default function FindWorkPage() {
     <div className="space-y-6">
       {error && <ErrorNote message={error} />}
 
-      <section aria-label="Where you are">
-        <Card title="Where are you?">
-          <div className="space-y-5 px-5 py-4">
-            {place && (
-              <p className="text-sm text-slate-700">
-                Showing work near <strong>{placeName}</strong>.
-              </p>
-            )}
+      <Card title="Where are you?">
+        <div className="space-y-5 px-5 py-4">
+          {place && (
+            <p className="text-sm text-slate-700">
+              Showing work near <strong>{placeName}</strong>.
+            </p>
+          )}
 
-            {proposed ? (
-              <div className="space-y-3 rounded-lg bg-slate-50 p-4 ring-1 ring-inset ring-slate-200">
-                <p className="text-sm text-slate-700">You are near</p>
-                <p className="text-xl font-semibold text-slate-900">{proposed.name}</p>
-                {proposed.area && <p className="text-xs text-slate-500">{proposed.area}</p>}
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => void searchAt(proposed)}>Yes, this is right</Button>
-                  <Button variant="secondary" onClick={() => setProposed(null)}>
-                    No, I will type it
-                  </Button>
-                </div>
+          {proposed ? (
+            <div className="space-y-3 rounded-lg bg-slate-50 p-4 ring-1 ring-inset ring-slate-200">
+              <p className="text-sm text-slate-700">You are near</p>
+              <p className="text-xl font-semibold text-slate-900">{proposed.name}</p>
+              {proposed.area && <p className="text-xs text-slate-500">{proposed.area}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void searchAt(proposed)}>Yes, this is right</Button>
+                <Button variant="secondary" onClick={() => setProposed(null)}>
+                  No, I will type it
+                </Button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void useMyLocation()}
-                disabled={locating}
-                className="flex min-h-14 w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:bg-slate-400"
-              >
-                {locating ? "Finding your town…" : "Use my location"}
-              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void useMyLocation()}
+              disabled={locating}
+              className="flex min-h-14 w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-3 text-base font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:bg-slate-400"
+            >
+              {locating ? "Finding your town…" : "Use my location"}
+            </button>
+          )}
+
+          <div className="space-y-2">
+            <label htmlFor="town-search" className="block text-sm font-medium text-slate-700">
+              Or type the name of your town
+            </label>
+            <input
+              id="town-search"
+              type="search"
+              autoComplete="off"
+              placeholder="For example: Perumbavoor"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className={`${inputClass} min-h-12 text-base`}
+            />
+
+            {lookingUp && <p className="text-xs text-slate-500">Looking for towns…</p>}
+
+            {optionsSource === "fallback" && options.length > 0 && (
+              <InfoNote>
+                Town search is not working right now, so only district towns are shown. Choose
+                the one closest to you.
+              </InfoNote>
             )}
 
-            <div className="space-y-2">
-              <label htmlFor="town-search" className="block text-sm font-medium text-slate-700">
-                Or type the name of your town
-              </label>
-              <input
-                id="town-search"
-                type="search"
-                autoComplete="off"
-                placeholder="For example: Perumbavoor"
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                className={`${inputClass} min-h-12 text-base`}
-              />
+            {!lookingUp && typed.trim().length >= 2 && options.length === 0 && (
+              <p className="text-sm text-slate-500">No town found. Try fewer letters.</p>
+            )}
 
-              {lookingUp && <p className="text-xs text-slate-500">Looking for towns…</p>}
-
-              {optionsSource === "fallback" && options.length > 0 && (
-                <InfoNote>
-                  Town search is not working right now, so only district towns are shown. Choose
-                  the one closest to you.
-                </InfoNote>
-              )}
-
-              {!lookingUp && typed.trim().length >= 2 && options.length === 0 && (
-                <p className="text-sm text-slate-500">No town found. Try fewer letters.</p>
-              )}
-
-              {options.length > 0 && (
-                <ul className="space-y-2">
-                  {options.map((o) => (
-                    <li key={`${o.name}|${o.latitude}|${o.longitude}`}>
-                      <button
-                        type="button"
-                        onClick={() => void searchAt(o)}
-                        className="min-h-12 w-full rounded-lg bg-white px-4 py-3 text-left ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-                      >
-                        <span className="block text-base font-medium text-slate-900">{o.name}</span>
-                        {o.area && <span className="block text-xs text-slate-500">{o.area}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            {options.length > 0 && (
+              <ul className="space-y-2">
+                {options.map((o) => (
+                  <li key={`${o.name}|${o.latitude}|${o.longitude}`}>
+                    <button
+                      type="button"
+                      onClick={() => void searchAt(o)}
+                      className="min-h-12 w-full rounded-lg bg-white px-4 py-3 text-left ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                    >
+                      <span className="block text-base font-medium text-slate-900">{o.name}</span>
+                      {o.area && <span className="block text-xs text-slate-500">{o.area}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        </Card>
-      </section>
+        </div>
+      </Card>
+    
 
       <Card title="Can contractors see you?">
         <div className="space-y-3 px-5 py-4 text-sm text-slate-700">
@@ -348,69 +347,67 @@ export default function FindWorkPage() {
           )}
 
           {results.contractors.length > 0 && (
-            <section aria-label="Contractors hiring">
-              <Card
-                title="Contractors hiring"
-                description="Contractors near you who are hiring."
-              >
-                <ul className="divide-y divide-slate-100">
-                  {results.contractors.map((c) => (
-                    <li
-                      key={c.id}
-                      className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{c.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {[c.company, c.preferredWorkType].filter(Boolean).join(" · ")}
-                        </p>
-                      </div>
-                      <div className="text-right text-sm">
-                        <p className="text-slate-700">{c.distanceKm} km</p>
-                        <PhoneLink phone={c.phone} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </section>
+            <Card
+              title="Contractors hiring"
+              description="Contractors near you who are hiring."
+            >
+              <ul className="divide-y divide-slate-100">
+                {results.contractors.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{c.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {[c.company, c.preferredWorkType].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                    <div className="text-right text-sm">
+                      <p className="text-slate-700">{c.distanceKm} km</p>
+                      <PhoneLink phone={c.phone} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          
           )}
 
           {results.businesses.length > 0 && (
-            <section aria-label="Public business listings">
-              <Card
-                title="Public business listings"
-                description="These are businesses, not job offers."
-              >
-                <ul className="divide-y divide-slate-100">
-                  {results.businesses.map((b) => (
-                    <li
-                      key={b.id}
-                      className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{b.name}</p>
-                        <p className="text-xs text-slate-500">{b.category}</p>
-                      </div>
-                      <div className="text-right text-sm">
-                        <p className="text-slate-700">{b.distanceKm} km</p>
-                        {/* A listing's number is often a landline with its own
-                         * area code, so it is dialled as written, not as +91
-                         * plus a mobile number. */}
-                        {b.phone && (
-                          <a
-                            href={`tel:${b.phone}`}
-                            className="font-medium text-sky-700 underline decoration-sky-300 hover:text-sky-900"
-                          >
-                            {b.phone}
-                          </a>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </section>
+            <Card
+              title="Public business listings"
+              description="These are businesses, not job offers."
+            >
+              <ul className="divide-y divide-slate-100">
+                {results.businesses.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{b.name}</p>
+                      <p className="text-xs text-slate-500">{b.category}</p>
+                    </div>
+                    <div className="text-right text-sm">
+                      <p className="text-slate-700">{b.distanceKm} km</p>
+                      {/* A listing's number is often a landline with its own
+                       * area code, so it is dialled as written, not as +91
+                       * plus a mobile number. */}
+                      {b.phone && (
+                        <a
+                          href={`tel:${b.phone}`}
+                          className="font-medium text-sky-700 underline decoration-sky-300 hover:text-sky-900"
+                        >
+                          {b.phone}
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          
           )}
         </>
       )}

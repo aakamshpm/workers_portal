@@ -176,7 +176,7 @@ export default function ContractorDashboard({
                       {b.lastPaymentOn ? ` · you last paid him on ${formatDate(b.lastPaymentOn)}` : ""}
                     </p>
                     {onGoToPayment && (
-                      <Button size="sm" onClick={() => onGoToPayment(b.offerId)}>
+                      <Button onClick={() => onGoToPayment(b.offerId)}>
                         Pay this worker
                       </Button>
                     )}
@@ -312,7 +312,7 @@ function SendOfferForm({
       title="Offer work to a worker"
       description="Enter the daily rate you agreed verbally. The worker receives it on his phone and must accept it before any work can be recorded."
       actions={
-        <Button variant={open ? "ghost" : "primary"} size="sm" onClick={() => setOpen(!open)}>
+        <Button variant={open ? "ghost" : "primary"} onClick={() => setOpen(!open)}>
           {open ? "Cancel" : "Offer work"}
         </Button>
       }
@@ -661,7 +661,7 @@ function EmployerReplyRow({
             required
           />
         </Field>
-        <Button size="sm" disabled={busy || note.trim().length < 3} onClick={() => void submit()}>
+        <Button disabled={busy || note.trim().length < 3} onClick={() => void submit()}>
           {busy ? "Sending…" : "Send my answer"}
         </Button>
       </div>

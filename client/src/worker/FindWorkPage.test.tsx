@@ -134,7 +134,7 @@ describe("FindWorkPage", () => {
     expect(await screen.findByText(/nobody near you is hiring/i)).toBeTruthy();
     expect(mocked.nearbyWork).toHaveBeenCalledWith(9.9816, 76.2999, 25);
     // The stored name, not coordinates and not a new lookup.
-    expect(screen.getByRole("region", { name: /where you are/i }).textContent).toContain(
+    expect(screen.getByRole("region", { name: /where are you/i }).textContent).toContain(
       "Ernakulam",
     );
     expect(mocked.nearestPlace).not.toHaveBeenCalled();

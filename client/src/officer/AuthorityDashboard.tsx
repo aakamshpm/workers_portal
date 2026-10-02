@@ -404,7 +404,7 @@ function ComplaintCase({
           behaviour history, not evidence about this case. */}
       <div className="border-b border-slate-200 px-5 py-3">
         {!track ? (
-          <Button variant="secondary" size="sm" onClick={() => void loadTrack()}>
+          <Button variant="secondary" size="dense" onClick={() => void loadTrack()}>
             Show the history of both parties
           </Button>
         ) : (
@@ -442,17 +442,17 @@ function ComplaintCase({
         {action === "" ? (
           <div className="flex flex-wrap gap-2">
             {c.status !== "AWAITING_EMPLOYER" && (
-              <Button size="sm" variant="secondary" onClick={() => setAction("ask")}>
+              <Button size="dense" variant="secondary" onClick={() => setAction("ask")}>
                 Request an explanation
               </Button>
             )}
-            <Button size="sm" variant="secondary" onClick={() => setAction("contact")}>
+            <Button size="dense" variant="secondary" onClick={() => setAction("contact")}>
               Record a call
             </Button>
-            <Button size="sm" onClick={() => setAction("decide")}>
+            <Button size="dense" onClick={() => setAction("decide")}>
               Issue a decision
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setAction("escalate")}>
+            <Button size="dense" variant="secondary" onClick={() => setAction("escalate")}>
               Forward to a higher office
             </Button>
           </div>
@@ -472,7 +472,7 @@ function ComplaintCase({
                   />
                 </Field>
                 <Button
-                  size="sm"
+                  size="dense"
                   disabled={busy || note.trim().length < 5}
                   onClick={() =>
                     void run(
@@ -520,7 +520,7 @@ function ComplaintCase({
                   />
                 </Field>
                 <Button
-                  size="sm"
+                  size="dense"
                   disabled={busy || note.trim().length < 3}
                   onClick={() =>
                     void run(
@@ -568,7 +568,7 @@ function ComplaintCase({
                   />
                 </Field>
                 <Button
-                  size="sm"
+                  size="dense"
                   disabled={busy || note.trim().length < 10}
                   onClick={() =>
                     void run(() => api.decide(c.id, outcome, note), "Decision recorded, and the worker has been notified.")
@@ -610,7 +610,7 @@ function ComplaintCase({
                   />
                 </Field>
                 <Button
-                  size="sm"
+                  size="dense"
                   disabled={busy || note.trim().length < 10}
                   onClick={() =>
                     void run(() => api.escalate(c.id, escalateTo, note), "Forwarded, with your grounds recorded.")
@@ -621,7 +621,7 @@ function ComplaintCase({
               </>
             )}
 
-            <Button variant="ghost" size="sm" onClick={() => setAction("")}>
+            <Button variant="ghost" size="dense" onClick={() => setAction("")}>
               Cancel
             </Button>
           </div>
@@ -781,7 +781,7 @@ function DisputeRow({
           </p>
           <p className="mt-0.5 text-sm text-slate-700">{d.review.note}</p>
           <div className="mt-2">
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void reopen()}>
+            <Button variant="ghost" size="dense" disabled={busy} onClick={() => void reopen()}>
               {busy ? "Working…" : "Put back on my list"}
             </Button>
           </div>
@@ -815,17 +815,17 @@ function DisputeRow({
             />
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy || note.trim().length < 10} onClick={() => void save()}>
+            <Button size="dense" disabled={busy || note.trim().length < 10} onClick={() => void save()}>
               {busy ? "Saving…" : "Take off my list"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+            <Button variant="ghost" size="dense" onClick={() => setOpen(false)}>
               Cancel
             </Button>
           </div>
         </div>
       ) : (
         <div className="mt-3">
-          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <Button size="dense" variant="secondary" onClick={() => setOpen(true)}>
             No more action needed
           </Button>
         </div>

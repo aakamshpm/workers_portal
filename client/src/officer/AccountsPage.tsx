@@ -129,13 +129,11 @@ export default function AccountsPage() {
 
           {error && <ErrorNote message={error} />}
           {created && (
-            <div role="status">
-              <SuccessNote>
-                Account made for {created.name}. There is no PIN yet. Ask {created.name} to open the
-                sign-in page, tap “Forgot PIN?” and type the code that comes by SMS to{" "}
-                {formatPhone(created.phone)}.
-              </SuccessNote>
-            </div>
+            <SuccessNote>
+              Account made for {created.name}. There is no PIN yet. Ask {created.name} to open the
+              sign-in page, tap “Forgot PIN?” and type the code that comes by SMS to{" "}
+              {formatPhone(created.phone)}.
+            </SuccessNote>
           )}
 
           <Button type="submit" disabled={busy}>

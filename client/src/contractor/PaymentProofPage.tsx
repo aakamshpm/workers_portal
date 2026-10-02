@@ -339,7 +339,7 @@ function CashCodeFlow({
             </Field>
           </div>
 
-          <Button variant="success" disabled={busy || code.length !== 4} onClick={() => void confirm()}>
+          <Button variant="primary" disabled={busy || code.length !== 4} onClick={() => void confirm()}>
             {busy ? "Verifying…" : "Verify code"}
           </Button>
         </div>

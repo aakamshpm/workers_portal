@@ -176,17 +176,17 @@ function Row({
             />
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy || note.trim().length < 10} onClick={() => void submit()}>
+            <Button disabled={busy || note.trim().length < 10} onClick={() => void submit()}>
               {busy ? "Saving…" : "Add my answer to the file"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
           </div>
         </div>
       ) : (
         <div className="mt-3">
-          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <Button variant="secondary" onClick={() => setOpen(true)}>
             Write my answer
           </Button>
         </div>

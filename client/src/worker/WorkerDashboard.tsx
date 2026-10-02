@@ -165,7 +165,7 @@ export default function WorkerDashboard({
                       {b.openComplaints > 0 && ` · ${t("openComplaints", { count: b.openComplaints })}`}
                     </p>
                     {onFileComplaint && b.openComplaints === 0 && (
-                      <Button variant="secondary" size="sm" onClick={onFileComplaint}>
+                      <Button variant="secondary" onClick={onFileComplaint}>
                         {t("askOfficeHelp")}
                       </Button>
                     )}
@@ -244,10 +244,10 @@ function OfferRow({
 
       {!refusing ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button variant="success" size="sm" disabled={busy} onClick={() => void respond("ACCEPT")}>
+          <Button variant="primary" disabled={busy} onClick={() => void respond("ACCEPT")}>
             {busy ? t("sending") : t("yesTakeWork")}
           </Button>
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => setRefusing(true)}>
+          <Button variant="secondary" disabled={busy} onClick={() => setRefusing(true)}>
             {t("noDontWant")}
           </Button>
           <OfferBadge status={offer.status} />
@@ -267,10 +267,10 @@ function OfferRow({
             />
           </Field>
           <div className="flex gap-2">
-            <Button variant="danger" size="sm" disabled={busy} onClick={() => void respond("DECLINE")}>
+            <Button variant="danger" disabled={busy} onClick={() => void respond("DECLINE")}>
               {busy ? t("sending") : t("sendMyNo")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setRefusing(false)}>
+            <Button variant="ghost" onClick={() => setRefusing(false)}>
               {t("goBack")}
             </Button>
           </div>
@@ -360,10 +360,10 @@ function AwaitingRow({
 
       {!objecting ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button variant="success" size="sm" disabled={busy} onClick={() => void decide("CONFIRM")}>
+          <Button variant="primary" disabled={busy} onClick={() => void decide("CONFIRM")}>
             {busy ? t("sending") : isWork ? t("yesCorrect") : t("yesGotMoney")}
           </Button>
-          <Button variant="secondary" size="sm" disabled={busy} onClick={() => setObjecting(true)}>
+          <Button variant="secondary" disabled={busy} onClick={() => setObjecting(true)}>
             {isWork ? t("noNotCorrect") : t("noDidNotGet")}
           </Button>
           {item.ref && (
@@ -396,10 +396,10 @@ function AwaitingRow({
             />
           </Field>
           <div className="flex gap-2">
-            <Button variant="danger" size="sm" disabled={busy} onClick={() => void decide("REJECT")}>
+            <Button variant="danger" disabled={busy} onClick={() => void decide("REJECT")}>
               {busy ? t("sending") : t("sendMyAnswer")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setObjecting(false)}>
+            <Button variant="ghost" onClick={() => setObjecting(false)}>
               {t("goBack")}
             </Button>
           </div>

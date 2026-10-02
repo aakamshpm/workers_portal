@@ -4,6 +4,7 @@ import { hi } from "./hi";
 import { bn } from "./bn";
 import { ml } from "./ml";
 import { or } from "./or";
+import Icon from "../components/Icon";
 
 /**
  * Worker text in five languages. ADR-0015.
@@ -108,19 +109,17 @@ export function LanguagePicker({ className = "" }: { className?: string }) {
   const { language, setLanguage, t } = useT();
   if (!setLanguage) return null;
   return (
-    <label className={`inline-flex items-center gap-2 text-sm text-slate-600 ${className}`}>
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" />
-      </svg>
-      <span className="sr-only">{t("language")}</span>
+    <label
+      className={`inline-flex min-h-[var(--size-touch)] items-center gap-space-xs rounded-full bg-surface-container pl-space-md text-on-surface focus-within:ring-2 focus-within:ring-primary ${className}`}
+    >
+      <Icon name="language" className="text-primary" />
       <select
         aria-label={t("language")}
         value={language}
         onChange={(e) => {
           if (isLanguage(e.target.value)) setLanguage(e.target.value);
         }}
-        className="min-h-10 rounded-md border-0 bg-white py-1.5 pr-8 pl-3 text-sm font-medium text-slate-800 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+        className="min-h-[var(--size-touch)] cursor-pointer rounded-full border-0 bg-transparent py-0 pr-space-md pl-space-xs font-label-md text-label-md text-on-surface focus:outline-none"
       >
         {LANGUAGES.map((l) => (
           <option key={l.code} value={l.code} lang={l.code}>
