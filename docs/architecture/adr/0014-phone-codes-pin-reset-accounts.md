@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted. The rule that `POST /api/auth/code` answers the same for every number is replaced by ADR-0020.
 
 ## Context
 

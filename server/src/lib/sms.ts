@@ -253,12 +253,35 @@ export async function send(input: {
  *
  * Like `send()`, it fails when there is no Textbee key and no fake provider.
  */
+/** How long a code SMS may take before it counts as failed (ADR-0020). */
+const DEFAULT_SEND_TIMEOUT_MS = 15_000;
+let sendTimeoutMs = DEFAULT_SEND_TIMEOUT_MS;
+
+/** Tests shorten the limit so a gateway that never answers does not hold them up. */
+export function setSendTimeoutMs(ms: number | null) {
+  sendTimeoutMs = ms ?? DEFAULT_SEND_TIMEOUT_MS;
+}
+
+/**
+ * Without a limit, a gateway phone that is off or has no signal can keep
+ * Textbee from answering for minutes, and the worker's screen stays on
+ * "Sending..." all that time. After the limit the send counts as failed, and
+ * the caller treats it like any other failed send.
+ */
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`SMS gateway did not answer within ${ms} ms`)), ms);
+  });
+  return Promise.race([work, limit]).finally(() => clearTimeout(timer));
+}
+
 export async function sendCodeSms(phone: string, body: string): Promise<void> {
   if (customProvider === null && !getTextbeeApiKey()) {
     throw new Error("TEXTBEE_API_KEY is not set. Set it in server/.env");
   }
   const to = phone.startsWith("+") ? phone : `+91${phone}`;
-  await getSmsProvider().send({ to, body });
+  await withTimeout(getSmsProvider().send({ to, body }), sendTimeoutMs);
 }
 
 // ---------------------------------------------------------------------------

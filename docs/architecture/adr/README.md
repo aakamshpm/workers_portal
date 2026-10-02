@@ -23,3 +23,4 @@ One short file per decision. Next number after the last file. Skill: `write-adr`
 | [0017](0017-merkle-tree-over-ledger.md) | Merkle tree over the ledger |
 | [0018](0018-pwa-manifests-and-service-worker.md) | PWA manifests, service worker and install button |
 | [0019](0019-one-design-system.md) | One design system for the three apps |
+| [0020](0020-phone-code-route-tells-the-truth.md) | The phone-code route says when a number is or is not registered |

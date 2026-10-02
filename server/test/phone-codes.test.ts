@@ -13,8 +13,9 @@ import type { AddressInfo } from "node:net";
  * - nobody can register a phone number without the code sent to that phone;
  * - a code is 6 digits, works once, expires, and dies after 5 wrong tries;
  * - the code is never stored in plain text;
- * - asking for a code answers the same way for registered and unregistered
- *   numbers, so the route cannot be used to find out who has an account;
+ * - a code is sent only where it can be used: a REGISTER code to a number
+ *   with no account, a RESET_PIN code to a number with one (the refusals
+ *   themselves are in auth-truth.test.ts, ADR-0020);
  * - codes are limited to 1 a minute and 5 a day per number;
  * - "forgot PIN" sets a new PIN only with a code sent to the account's phone,
  *   and it clears the wrong-PIN lock;
@@ -156,13 +157,13 @@ describe("phone codes and accounts", () => {
     for (const row of rows) assert.ok(!JSON.stringify(row).includes(code), "the plain code must not be stored");
   });
 
-  it("answers the same for registered and unregistered numbers, and sends only where it makes sense", async () => {
+  it("sends no SMS to a registered number for REGISTER, or to an unknown one for RESET_PIN", async () => {
     await skipWait(P.existing);
     const reg = await post("/api/auth/code", { phone: P.existing, purpose: "REGISTER" });
     const reset = await post("/api/auth/code", { phone: P.quiet, purpose: "RESET_PIN" });
-    assert.deepEqual(reg, { status: 200, body: { sent: true, expiresInMinutes: 10 } });
-    assert.deepEqual(reset, { status: 200, body: { sent: true, expiresInMinutes: 10 } });
-    assert.equal(sent.length, 0, "no SMS to a registered number for REGISTER, or an unknown one for RESET_PIN");
+    assert.equal(reg.status, 409);
+    assert.equal(reset.status, 404);
+    assert.equal(sent.length, 0);
   });
 
   it("allows only one code a minute per number", async () => {

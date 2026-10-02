@@ -28,14 +28,19 @@ const GAP_MS = 60_000;
 const MAX_PER_DAY = 5;
 
 export type CodeRequest =
-  | { ok: true; code: string }
-  | { ok: false; status: 429; error: string };
+  | { ok: true; code: string; id: string }
+  | { ok: false; status: 429; code: "CODE_WAIT" | "CODE_DAILY_LIMIT"; error: string };
 
 /**
- * Make a new code for a phone and purpose, if the limits allow it.
+ * Check the limits, then store a new code for a phone and purpose.
  *
  * Returns the plain code so the caller can send it. The plain code is never
  * stored, and it is not returned to the browser.
+ *
+ * The earlier code is not retired here. The caller does that with `confirmSent`
+ * once the SMS has gone out, or removes the new row with `discardCode` when it
+ * has not (ADR-0020). So a failed send leaves the worker with the code he
+ * already has, and with his limits as they were.
  */
 export async function createCode(phone: string, purpose: CodePurpose): Promise<CodeRequest> {
   const now = Date.now();
@@ -48,32 +53,45 @@ export async function createCode(phone: string, purpose: CodePurpose): Promise<C
   });
 
   if (recent[0] && now - recent[0].createdAt.getTime() < GAP_MS) {
-    return { ok: false, status: 429, error: "Wait a minute before asking for another code." };
+    return { ok: false, status: 429, code: "CODE_WAIT", error: "Wait a minute before asking for another code." };
   }
   if (recent.length >= MAX_PER_DAY) {
-    return { ok: false, status: 429, error: "Too many codes today. Try again tomorrow." };
+    return { ok: false, status: 429, code: "CODE_DAILY_LIMIT", error: "Too many codes today. Try again tomorrow." };
   }
 
   // randomInt's upper bound is exclusive, so this is 000000 to 999999.
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
 
-  await prisma.$transaction([
-    // Retire any live code for this phone and purpose, so only the newest works.
-    prisma.phoneCode.updateMany({
-      where: { phone, purpose, usedAt: null },
-      data: { usedAt: new Date(now) },
-    }),
-    prisma.phoneCode.create({
-      data: {
-        phone,
-        purpose,
-        codeHash: await bcrypt.hash(code, 10),
-        expiresAt: new Date(now + CODE_MINUTES * 60_000),
-      },
-    }),
-  ]);
+  const row = await prisma.phoneCode.create({
+    data: {
+      phone,
+      purpose,
+      codeHash: await bcrypt.hash(code, 10),
+      expiresAt: new Date(now + CODE_MINUTES * 60_000),
+    },
+    select: { id: true },
+  });
 
-  return { ok: true, code };
+  return { ok: true, code, id: row.id };
+}
+
+/**
+ * The SMS went out: retire every other live code for this phone and purpose,
+ * so only the newest one works.
+ */
+export async function confirmSent(phone: string, purpose: CodePurpose, id: string): Promise<void> {
+  await prisma.phoneCode.updateMany({
+    where: { phone, purpose, usedAt: null, id: { not: id } },
+    data: { usedAt: new Date() },
+  });
+}
+
+/**
+ * The SMS did not go out: remove the new code, so it counts towards neither
+ * limit and the earlier code stays the one that works.
+ */
+export async function discardCode(id: string): Promise<void> {
+  await prisma.phoneCode.deleteMany({ where: { id } });
 }
 
 /**

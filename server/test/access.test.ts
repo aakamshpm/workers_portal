@@ -300,7 +300,9 @@ describe("wrong PINs", () => {
 
   it("five wrong PINs lock the number, and then even the right PIN is refused", async () => {
     await unlock();
-    for (let i = 0; i < 5; i++) assert.equal((await login("0000")).status, 401);
+    for (let i = 0; i < 4; i++) assert.equal((await login("0000")).status, 401);
+    // The fifth says so at once (ADR-0020), rather than answering like the others.
+    assert.equal((await login("0000")).status, 429);
     const locked = await login("4321");
     assert.equal(locked.status, 429);
     assert.match(locked.body.error ?? "", /15 minutes/);

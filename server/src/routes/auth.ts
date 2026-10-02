@@ -1,12 +1,60 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { normalisePhone, requireAuth, signToken, type Role } from "../lib/auth";
 import { HOME_STATES, STATE_LANGUAGE, phoneCodeMessage, sendCodeSms, type Language } from "../lib/sms";
-import { CODE_MINUTES, createCode, useCode, type CodePurpose } from "../lib/phoneCodes";
+import {
+  CODE_MINUTES,
+  confirmSent,
+  createCode,
+  discardCode,
+  useCode,
+  type CodePurpose,
+} from "../lib/phoneCodes";
 
 export const authRouter = Router();
+
+/**
+ * Every refusal from these routes carries a fixed code next to the English
+ * message (ADR-0020). The sign-in page shows its own text for the code, in the
+ * reader's language; the English is for logs and for the staff apps.
+ * The list is in docs/contracts/auth.md.
+ */
+type AuthError =
+  | "INVALID_INPUT"
+  | "INVALID_PHONE"
+  | "PHONE_REGISTERED"
+  | "PHONE_NOT_REGISTERED"
+  | "CODE_WAIT"
+  | "CODE_DAILY_LIMIT"
+  | "SMS_FAILED"
+  | "CODE_WRONG"
+  | "WRONG_PIN"
+  | "PIN_LOCKED";
+
+function refuse(
+  res: Response,
+  status: number,
+  code: AuthError,
+  error: string,
+  extra: Record<string, unknown> = {},
+) {
+  return res.status(status).json({ error, code, ...extra });
+}
+
+/**
+ * The first problem zod found, as the English message. A problem with the
+ * phone field is INVALID_PHONE, the same code the 10-digit check gives, so a
+ * short number gets one answer whichever check caught it.
+ */
+function invalid(res: Response, issues: { message: string; path: PropertyKey[] }[]) {
+  const first = issues[0];
+  if (first?.path[0] === "phone") {
+    return refuse(res, 400, "INVALID_PHONE", "Enter a 10-digit mobile number");
+  }
+  return refuse(res, 400, "INVALID_INPUT", first?.message ?? "Invalid input");
+}
 
 /**
  * Wrong-PIN lock (ADR-0013).
@@ -18,7 +66,19 @@ export const authRouter = Router();
  */
 const MAX_WRONG_PINS = 5;
 const LOCK_MINUTES = 15;
-const LOCKED_MESSAGE = `Too many wrong PINs. Wait ${LOCK_MINUTES} minutes and try again.`;
+const WRONG_PIN = "Wrong phone number or PIN";
+
+/** Minutes left on a lock, rounded up, so "0 minutes" is never shown. */
+function minutesLeft(until: Date): number {
+  return Math.max(1, Math.ceil((until.getTime() - Date.now()) / 60_000));
+}
+
+function locked(res: Response, until: Date) {
+  const minutes = minutesLeft(until);
+  return refuse(res, 429, "PIN_LOCKED", `Too many wrong PINs. Wait ${minutes} minutes and try again.`, {
+    minutesLeft: minutes,
+  });
+}
 
 const loginSchema = z.object({
   phone: z.string().min(6, "Enter your phone number"),
@@ -36,9 +96,7 @@ const loginSchema = z.object({
  */
 authRouter.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-  }
+  if (!parsed.success) return invalid(res, parsed.error.issues);
 
   const phone = normalisePhone(parsed.data.phone);
   const user = await prisma.user.findUnique({ where: { phone } });
@@ -46,7 +104,7 @@ authRouter.post("/login", async (req, res) => {
   // A locked number is refused before the PIN is even compared, so guessing
   // during the lock learns nothing, not even whether a guess was right.
   if (user?.lockedUntil && user.lockedUntil > new Date()) {
-    return res.status(429).json({ error: LOCKED_MESSAGE });
+    return locked(res, user.lockedUntil);
   }
 
   // Same message whether the number is unknown or the PIN is wrong, so the
@@ -55,12 +113,12 @@ authRouter.post("/login", async (req, res) => {
   // sign in. It answers like a wrong PIN, and it is not counted towards the
   // lock, because no PIN exists that could be guessed.
   if (user && user.pin === null) {
-    return res.status(401).json({ error: "Wrong phone number or PIN" });
+    return refuse(res, 401, "WRONG_PIN", WRONG_PIN);
   }
 
   const ok = user?.pin ? await bcrypt.compare(parsed.data.pin, user.pin) : false;
   if (!user) {
-    return res.status(401).json({ error: "Wrong phone number or PIN" });
+    return refuse(res, 401, "WRONG_PIN", WRONG_PIN);
   }
 
   if (!ok) {
@@ -72,12 +130,16 @@ authRouter.post("/login", async (req, res) => {
       select: { failedPinCount: true },
     });
     if (after.failedPinCount >= MAX_WRONG_PINS) {
+      const until = new Date(Date.now() + LOCK_MINUTES * 60_000);
       await prisma.user.update({
         where: { id: user.id },
-        data: { lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000), failedPinCount: 0 },
+        data: { lockedUntil: until, failedPinCount: 0 },
       });
+      // Said now, on the fifth, so the worker does not type a sixth PIN and
+      // only then learn that the number was already locked.
+      return locked(res, until);
     }
-    return res.status(401).json({ error: "Wrong phone number or PIN" });
+    return refuse(res, 401, "WRONG_PIN", WRONG_PIN);
   }
 
   if (user.failedPinCount > 0 || user.lockedUntil) {
@@ -123,41 +185,54 @@ const codeSchema = z.object({
 /**
  * POST /api/auth/code
  *
- * Send a one-time 6-digit code by SMS (ADR-0014).
+ * Send a one-time 6-digit code by SMS (ADR-0014, ADR-0020).
  *
- * The answer is the same whether or not the number has an account, so this
- * route cannot be used to find out who is registered. The SMS itself goes out
- * only when it is useful: a REGISTER code only to a new number, a RESET_PIN
- * code only to a number that has an account.
+ * The route says what happened, because a worker told "a code is coming" when
+ * none is waits for an SMS that never arrives:
+ *   - a registration code for a number that already has an account, and a
+ *     reset code for a number with none, are refused, and nothing is sent;
+ *   - `sent: true` means the SMS was handed to the gateway;
+ *   - a failed send removes the new code, so the worker keeps the code he
+ *     already has and his limits are not used up.
  *
- * The limits (1 a minute, 5 a day) are checked first, and for every number,
- * so a refused request looks the same for registered and unregistered numbers.
+ * This tells anyone whether a number has an account. ADR-0020 records why that
+ * is accepted.
  */
 authRouter.post("/code", async (req, res) => {
   const parsed = codeSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-  }
+  if (!parsed.success) return invalid(res, parsed.error.issues);
   const phone = normalisePhone(parsed.data.phone);
   if (phone.length !== 10) {
-    return res.status(400).json({ error: "Enter a 10-digit mobile number" });
+    return refuse(res, 400, "INVALID_PHONE", "Enter a 10-digit mobile number");
   }
   const purpose: CodePurpose = parsed.data.purpose;
 
   const user = await prisma.user.findUnique({ where: { phone }, select: { language: true } });
-  const shouldSend = purpose === "REGISTER" ? user === null : user !== null;
-
-  if (shouldSend) {
-    const made = await createCode(phone, purpose);
-    if (!made.ok) return res.status(made.status).json({ error: made.error });
-
-    // The account's own language for a reset; the chosen one for a new worker.
-    const language = (user?.language ?? parsed.data.language ?? "en") as Language;
-    await sendCodeSms(phone, phoneCodeMessage(made.code, language));
+  if (purpose === "REGISTER" && user) {
+    return refuse(res, 409, "PHONE_REGISTERED", "That number already has an account. Sign in, or use Forgot PIN.");
   }
+  if (purpose === "RESET_PIN" && !user) {
+    return refuse(res, 404, "PHONE_NOT_REGISTERED", "That number has no account. A new worker can make one.");
+  }
+
+  const made = await createCode(phone, purpose);
+  if (!made.ok) return refuse(res, made.status, made.code, made.error);
+
+  // The account's own language for a reset; the chosen one for a new worker.
+  const language = (user?.language ?? parsed.data.language ?? "en") as Language;
+  try {
+    await sendCodeSms(phone, phoneCodeMessage(made.code, language));
+  } catch (err) {
+    await discardCode(made.id);
+    console.error("code SMS failed:", err instanceof Error ? err.message : err);
+    return refuse(res, 502, "SMS_FAILED", "The SMS could not be sent. Please try again.");
+  }
+  await confirmSent(phone, purpose, made.id);
 
   return res.json({ sent: true, expiresInMinutes: CODE_MINUTES });
 });
+
+const CODE_WRONG = "That code is wrong or has expired. Ask for a new code.";
 
 const registerSchema = z.object({
   phone: z.string().min(6, "Enter your phone number"),
@@ -182,25 +257,21 @@ const registerSchema = z.object({
  */
 authRouter.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-  }
+  if (!parsed.success) return invalid(res, parsed.error.issues);
 
   const { name, pin, homeState, code } = parsed.data;
   const phone = normalisePhone(parsed.data.phone);
   if (phone.length !== 10) {
-    return res.status(400).json({ error: "Enter a 10-digit mobile number" });
+    return refuse(res, 400, "INVALID_PHONE", "Enter a 10-digit mobile number");
   }
 
   const existing = await prisma.user.findUnique({ where: { phone } });
   if (existing) {
-    return res.status(409).json({
-      error: "That number is already registered. Sign in with your PIN instead.",
-    });
+    return refuse(res, 409, "PHONE_REGISTERED", "That number already has an account. Sign in, or use Forgot PIN.");
   }
 
   if (!(await useCode(phone, "REGISTER", code))) {
-    return res.status(400).json({ error: "That code is wrong or has expired. Ask for a new code." });
+    return refuse(res, 400, "CODE_WRONG", CODE_WRONG);
   }
 
   const language: Language =
@@ -236,16 +307,14 @@ const resetSchema = z.object({
  */
 authRouter.post("/reset-pin", async (req, res) => {
   const parsed = resetSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-  }
+  if (!parsed.success) return invalid(res, parsed.error.issues);
   const phone = normalisePhone(parsed.data.phone);
 
   // The code is checked before the account is looked up, so an unknown number
   // and a wrong code give the same answer.
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user || !(await useCode(phone, "RESET_PIN", parsed.data.code))) {
-    return res.status(400).json({ error: "That code is wrong or has expired. Ask for a new code." });
+    return refuse(res, 400, "CODE_WRONG", CODE_WRONG);
   }
 
   const updated = await prisma.user.update({
@@ -270,9 +339,7 @@ const languageSchema = z.object({ language: z.enum(LANGUAGES, { error: "Choose o
  */
 authRouter.patch("/language", requireAuth, async (req, res) => {
   const parsed = languageSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-  }
+  if (!parsed.success) return invalid(res, parsed.error.issues);
   const updated = await prisma.user.update({
     where: { id: req.user!.id },
     data: { language: parsed.data.language },
