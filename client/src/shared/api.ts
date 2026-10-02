@@ -51,35 +51,82 @@ export function clearSession() {
 }
 
 /**
- * Thin wrapper over fetch. Attaches the token and turns a non-2xx response into a
- * thrown Error carrying the server's own message, so every caller needs one
- * try/catch and can show `err.message` directly.
+ * A failed request, with a fixed `code` the page can translate (ADR-0020).
+ *
+ * `code` is the server's own code when it sent one (docs/contracts/auth.md),
+ * or one of these, set here:
+ *   - NETWORK: the request never reached the server (no internet, the phone
+ *     is offline, the server's machine is off);
+ *   - SERVER: something answered, but not with the server's JSON, such as a
+ *     proxy's error page while the API is down;
+ *   - SESSION_ENDED: a signed-in request was refused because the session is
+ *     no longer valid;
+ *   - UNKNOWN: the server refused without a code. Most routes outside
+ *     sign-in do not send codes yet, and their English message is kept in
+ *     `message`, which the staff apps show as it is.
+ *
+ * `details` holds any other field the server sent, such as `minutesLeft`.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly status: number,
+    public readonly details: Record<string, unknown> = {},
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/**
+ * Thin wrapper over fetch. Attaches the token and turns every failure into an
+ * ApiError, so every caller needs one try/catch.
  */
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
 
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-  });
-
-  if (res.status === 401) {
-    // Token expired or invalid. Drop it and go to the sign-in page at "/"
-    // rather than looping on failed requests (ADR-0012).
-    clearSession();
-    leaveTo(SIGN_IN);
-    throw new Error("Your session ended. Please sign in again.");
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
+    });
+  } catch {
+    // fetch throws only when no answer came back at all. Its own message,
+    // "Failed to fetch", means nothing to a worker.
+    throw new ApiError("No internet connection.", "NETWORK", 0);
   }
 
+  // Read as text first: a proxy in front of a stopped API answers with HTML
+  // or with nothing, and JSON.parse would throw "Unexpected token '<'".
   const text = await res.text();
-  const body = text ? JSON.parse(text) : null;
+  let body: Record<string, unknown> | null = null;
+  try {
+    body = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+  } catch {
+    body = null;
+  }
+
+  // A 401 means "your session ended" only for a request that carried a
+  // session. A sign-in request has none, and its 401 is a wrong PIN, which
+  // the page has to show instead of reloading itself (ADR-0020).
+  if (res.status === 401 && token) {
+    clearSession();
+    leaveTo(SIGN_IN);
+    throw new ApiError("Your session ended. Please sign in again.", "SESSION_ENDED", 401);
+  }
 
   if (!res.ok) {
-    throw new Error(body?.error ?? `Something went wrong (${res.status})`);
+    if (body === null || typeof body.error !== "string") {
+      throw new ApiError(`The server is not answering (${res.status}).`, "SERVER", res.status);
+    }
+    const { error, code, ...details } = body;
+    throw new ApiError(error, typeof code === "string" ? code : "UNKNOWN", res.status, details);
   }
 
   return body as T;

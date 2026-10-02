@@ -20,7 +20,9 @@ import type { AuthUser, Role } from "../shared/types";
  * The API module is mocked. No test reaches the server or textbee.dev.
  */
 
-vi.mock("../shared/api", () => ({
+// The real ApiError is kept, so the page reads the same `code` it gets in use.
+vi.mock("../shared/api", async (original) => ({
+  ApiError: (await original<typeof import("../shared/api")>()).ApiError,
   getStoredUser: vi.fn(),
   storeSession: vi.fn(),
   api: {
@@ -34,12 +36,16 @@ vi.mock("../shared/api", () => ({
 
 vi.mock("../shared/leave", () => ({ leaveTo: vi.fn() }));
 
-import { api, getStoredUser, storeSession } from "../shared/api";
+import { api, ApiError, getStoredUser, storeSession } from "../shared/api";
 import { leaveTo } from "../shared/leave";
 import SignInApp from "./App";
 import { DICTIONARIES } from "../shared/i18n";
 
 const mocked = vi.mocked(api);
+const en = DICTIONARIES.en;
+/** A refusal as the server sends it: English message, fixed code. */
+const refused = (code: string, status = 400, details: Record<string, unknown> = {}) =>
+  new ApiError("English text from the server", code, status, details);
 const person = (role: Role): AuthUser => ({ id: `u-${role}`, name: role, phone: "9845687924", role });
 
 beforeEach(() => {
@@ -120,11 +126,11 @@ describe("sign in", () => {
   });
 
   it("shows the server's message and empties the PIN boxes when the PIN is wrong", async () => {
-    mocked.login.mockRejectedValue(new Error("Wrong phone number or PIN"));
+    mocked.login.mockRejectedValue(refused("WRONG_PIN", 401));
     render(<SignInApp />);
     typePhone("9845687924");
     await typeDigits(/pin digit/i, "0000");
-    expect((await screen.findByRole("alert")).textContent).toMatch(/wrong phone number or pin/i);
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errWrongPin);
     for (const b of screen.getAllByLabelText(/pin digit/i) as HTMLInputElement[]) expect(b.value).toBe("");
   });
 
@@ -192,7 +198,7 @@ describe("new worker", () => {
   });
 
   it("shows the server's message when the code is refused", async () => {
-    mocked.register.mockRejectedValue(new Error("That code is wrong or has expired. Ask for a new code."));
+    mocked.register.mockRejectedValue(refused("CODE_WRONG"));
     await startRegistration();
     await typeDigits(/code digit/i, "000000");
     fireEvent.change(await screen.findByLabelText(/your name/i), { target: { value: "Ramu" } });
@@ -200,7 +206,7 @@ describe("new worker", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Assam" }));
     await typeDigits(/pin digit/i, "5739");
     await typeDigits(/again digit/i, "5739");
-    expect((await screen.findByRole("alert")).textContent).toMatch(/wrong or has expired/i);
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errCodeWrong);
     expect(leaveTo).not.toHaveBeenCalled();
   });
 });
@@ -226,11 +232,11 @@ describe("forgot PIN", () => {
   });
 
   it("shows the server's wait message when a code was asked for too recently", async () => {
-    mocked.sendPhoneCode.mockRejectedValue(new Error("Wait a minute before asking for another code."));
+    mocked.sendPhoneCode.mockRejectedValue(refused("CODE_WAIT", 429));
     render(<SignInApp />);
     fireEvent.click(screen.getByRole("button", { name: /forgot pin/i }));
     typePhone("9000010001");
-    expect((await screen.findByRole("alert")).textContent).toMatch(/wait a minute/i);
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errCodeWait);
     expect(screen.queryAllByLabelText(/code digit/i)).toHaveLength(0);
   });
 });
@@ -410,6 +416,157 @@ describe("layout", () => {
     typePhone("9845687924");
     await screen.findAllByLabelText(/code digit/i);
     expect(document.body.textContent).not.toMatch(claims);
+  });
+});
+
+/**
+ * ADR-0020: the page tells the worker what really happened, in his language.
+ *
+ * - each error code from the server has the page's own sentence, in the
+ *   reader's language, never the server's English;
+ * - a number that does not fit the flow is told so on the phone screen, with
+ *   the buttons for the right flow there;
+ * - a wrong code at the last step goes back to the code boxes, and the name,
+ *   state and PIN he already gave are kept, so he types only the code;
+ * - when the state list cannot load, he is told, and can try again;
+ * - a failure never leaves full boxes that he cannot type into again.
+ */
+describe("when something goes wrong", () => {
+  it("tells a worker who already has an account, on the phone screen, with the way out", async () => {
+    mocked.sendPhoneCode.mockRejectedValue(refused("PHONE_REGISTERED", 409));
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errPhoneRegistered);
+    expect(screen.queryAllByLabelText(/code digit/i)).toHaveLength(0);
+    expect(screen.getByRole("button", { name: en.havePin })).toBeTruthy();
+    expect(screen.getByRole("button", { name: en.forgotPin })).toBeTruthy();
+  });
+
+  it("tells someone resetting a PIN that the number has no account", async () => {
+    mocked.sendPhoneCode.mockRejectedValue(refused("PHONE_NOT_REGISTERED", 404));
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /forgot pin/i }));
+    typePhone("9845687924");
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errPhoneNotRegistered);
+    expect(screen.getByRole("button", { name: en.makeAccount })).toBeTruthy();
+  });
+
+  it("shows the error in the reader's language, not the server's English", async () => {
+    localStorage.setItem("wage-ledger-language", "ml");
+    mocked.login.mockRejectedValue(refused("WRONG_PIN", 401));
+    render(<SignInApp />);
+    fireEvent.change(screen.getByLabelText(DICTIONARIES.ml.phoneNumber), { target: { value: "9845687924" } });
+    fireEvent.click(screen.getByRole("button", { name: DICTIONARIES.ml.next }));
+    const boxes = await screen.findAllByRole("group");
+    expect(boxes.length).toBeGreaterThan(0);
+    const pins = document.querySelectorAll('input[type="password"]');
+    "0000".split("").forEach((d, i) => fireEvent.change(pins[i]!, { target: { value: d } }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(DICTIONARIES.ml.errWrongPin);
+    expect(alert.textContent).not.toContain("English text from the server");
+  });
+
+  it("says how many minutes are left when the number is locked", async () => {
+    mocked.login.mockRejectedValue(refused("PIN_LOCKED", 429, { minutesLeft: 7 }));
+    render(<SignInApp />);
+    typePhone("9845687924");
+    await typeDigits(/pin digit/i, "0000");
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errPinLocked.replace("{minutes}", "7"));
+  });
+
+  it("says there is no internet, rather than a technical message", async () => {
+    mocked.sendPhoneCode.mockRejectedValue(new ApiError("No internet connection.", "NETWORK", 0));
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errNetwork);
+  });
+
+  it("goes back to the code after a wrong code, and keeps everything else he typed", async () => {
+    mocked.register
+      .mockRejectedValueOnce(refused("CODE_WRONG"))
+      .mockResolvedValueOnce({ token: "t", user: person("WORKER") });
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    await typeDigits(/code digit/i, "111111");
+    fireEvent.change(await screen.findByLabelText(/your name/i), { target: { value: "Ramu" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Assam" }));
+    await typeDigits(/pin digit/i, "5739");
+    await typeDigits(/again digit/i, "5739");
+
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errCodeWrong);
+    const codeBoxes = (await screen.findAllByLabelText(/code digit/i)) as HTMLInputElement[];
+    for (const b of codeBoxes) expect(b.value).toBe("");
+
+    await typeDigits(/code digit/i, "482913");
+    await vi.waitFor(() => expect(leaveTo).toHaveBeenCalledWith("/worker/"));
+    expect(mocked.register).toHaveBeenLastCalledWith(
+      expect.objectContaining({ code: "482913", name: "Ramu", homeState: "Assam", pin: "5739" }),
+    );
+    expect(mocked.sendPhoneCode).toHaveBeenCalledTimes(1);
+  });
+
+  it("empties the PIN boxes after another failure, so he can type again", async () => {
+    mocked.register.mockRejectedValue(new ApiError("down", "SERVER", 502));
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    await typeDigits(/code digit/i, "482913");
+    fireEvent.change(await screen.findByLabelText(/your name/i), { target: { value: "Ramu" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Assam" }));
+    await typeDigits(/pin digit/i, "5739");
+    await typeDigits(/again digit/i, "5739");
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errServer);
+    for (const b of screen.getAllByLabelText(/again digit/i) as HTMLInputElement[]) expect(b.value).toBe("");
+  });
+
+  it("says when the state list cannot load, and loads it again on request", async () => {
+    mocked.states
+      .mockRejectedValueOnce(new ApiError("No internet connection.", "NETWORK", 0))
+      .mockResolvedValue([{ state: "Assam", language: "bn" }]);
+    render(<SignInApp />);
+    fireEvent.click(screen.getByRole("button", { name: /new worker/i }));
+    typePhone("9845687924");
+    await typeDigits(/code digit/i, "482913");
+    fireEvent.change(await screen.findByLabelText(/your name/i), { target: { value: "Ramu" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(en.errStates);
+    fireEvent.click(screen.getByRole("button", { name: en.tryAgain }));
+    expect(await screen.findByRole("button", { name: "Assam" })).toBeTruthy();
+  });
+});
+
+/**
+ * ADR-0019: the screen uses its height. The question and its answer sit at
+ * the top, the button that finishes the screen and the other ways out sit at
+ * the bottom, and the note for staff is the last thing on every screen.
+ */
+describe("the screen's height", () => {
+  it("explains what each answer is for, under the question", () => {
+    render(<SignInApp />);
+    const box = screen.getByLabelText(/phone number/i);
+    const hint = document.getElementById(box.getAttribute("aria-describedby")!);
+    expect(hint?.textContent).toBe(en.phoneHint);
+  });
+
+  it("keeps the note for staff as the last thing on every screen", async () => {
+    render(<SignInApp />);
+    const last = () => screen.getByRole("main").lastElementChild!;
+    expect(last().textContent).toContain(en.staffNote);
+    typePhone("9845687924");
+    await screen.findAllByLabelText(/pin digit/i);
+    expect(last().textContent).toContain(en.staffNote);
+  });
+
+  it("puts the bottom block at the foot of the screen, not under the question", () => {
+    render(<SignInApp />);
+    const bottom = screen.getByRole("main").lastElementChild!;
+    expect(bottom.className.split(/\s+/)).toContain("mt-auto");
   });
 });
 

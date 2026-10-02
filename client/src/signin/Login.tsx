@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, storeSession } from "../shared/api";
+import { api, ApiError, storeSession } from "../shared/api";
 import type { AuthUser } from "../shared/types";
 import DigitBoxes from "../shared/components/DigitBoxes";
 import AppHeader from "../shared/components/AppHeader";
@@ -11,6 +11,7 @@ import {
   type Language,
 } from "../shared/i18n";
 import type { MessageKey } from "../shared/i18n/en";
+import type { T } from "../shared/i18n";
 import { Button, ChoiceRow, Note, TextField, formatPhone } from "../shared/components/ui";
 
 /**
@@ -54,8 +55,36 @@ const STATE_KEY: Record<string, MessageKey> = {
   Kerala: "stateKerala",
 };
 
-function errorText(e: unknown, fallback: string) {
-  return e instanceof Error ? e.message : fallback;
+/**
+ * The page's own sentence for each error code (docs/contracts/auth.md,
+ * ADR-0020), so the worker reads it in his language and never the server's
+ * English.
+ */
+const ERROR_KEY: Record<string, MessageKey> = {
+  PHONE_REGISTERED: "errPhoneRegistered",
+  PHONE_NOT_REGISTERED: "errPhoneNotRegistered",
+  CODE_WAIT: "errCodeWait",
+  CODE_DAILY_LIMIT: "errCodeDailyLimit",
+  SMS_FAILED: "errSmsFailed",
+  CODE_WRONG: "errCodeWrong",
+  WRONG_PIN: "errWrongPin",
+  INVALID_PHONE: "phoneInvalid",
+  NETWORK: "errNetwork",
+  SERVER: "errServer",
+};
+
+function errorText(e: unknown, t: T, fallback: MessageKey): string {
+  if (!(e instanceof ApiError)) return t(fallback);
+  if (e.code === "PIN_LOCKED") {
+    const minutes = typeof e.details.minutesLeft === "number" ? e.details.minutesLeft : 15;
+    return t("errPinLocked", { minutes });
+  }
+  const key = ERROR_KEY[e.code];
+  return key ? t(key) : t(fallback);
+}
+
+function codeOf(e: unknown): string | null {
+  return e instanceof ApiError ? e.code : null;
 }
 
 export default function Login({
@@ -82,15 +111,25 @@ export default function Login({
   const [states, setStates] = useState<{ state: string; language: string }[]>(
     [],
   );
+  const [statesFailed, setStatesFailed] = useState(false);
+  const [codeMinutes, setCodeMinutes] = useState(10);
+  // Set when the last step found the code wrong. The worker types only the
+  // code again, and everything else he gave is sent with it.
+  const [retryingCode, setRetryingCode] = useState(false);
+
+  function loadStates() {
+    setStatesFailed(false);
+    api
+      .states()
+      .then(setStates)
+      .catch(() => setStatesFailed(true));
+  }
 
   useEffect(() => {
-    if (flow === "register" && states.length === 0) {
-      api
-        .states()
-        .then(setStates)
-        .catch(() => setStates([]));
-    }
-  }, [flow, states.length]);
+    // Loaded once per visit to the registration flow. A failed load is not
+    // retried here, because the state screen offers "Try again" itself.
+    if (flow === "register" && states.length === 0) loadStates();
+  }, [flow]);
 
   /** Start one of the three flows from the beginning. */
   function start(next: Flow) {
@@ -101,15 +140,25 @@ export default function Login({
     setCode("");
     setNewPin("");
     setNewPinAgain("");
+    setRetryingCode(false);
   }
 
-  async function run(action: () => Promise<void>, fallback: string) {
+  /**
+   * Run one request. On failure, show the page's own sentence and let
+   * `onFail` put the screen back where the worker can act on it.
+   */
+  async function run(
+    action: () => Promise<void>,
+    fallback: MessageKey,
+    onFail?: (code: string | null) => void,
+  ) {
     setBusy(true);
     setError("");
     try {
       await action();
     } catch (e) {
-      setError(errorText(e, fallback));
+      setError(errorText(e, t, fallback));
+      onFail?.(codeOf(e));
     } finally {
       setBusy(false);
     }
@@ -128,26 +177,26 @@ export default function Login({
     void run(async () => {
       // The SMS comes in the language the page is in. For a reset the server
       // uses the account's own language instead.
-      await api.sendPhoneCode({
+      const sent = await api.sendPhoneCode({
         phone: digitsOf(phone),
         purpose: flow === "register" ? "REGISTER" : "RESET_PIN",
         language,
       });
+      setCodeMinutes(sent.expiresInMinutes);
       setStep(FIRST_AFTER_PHONE[flow]);
-    }, t("errorSendCode"));
+    }, "errorSendCode");
   }
 
   function signIn(fullPin: string) {
-    void run(async () => {
-      try {
+    void run(
+      async () => {
         const { token, user } = await api.login(digitsOf(phone), fullPin);
         storeSession(token, user);
         onSignedIn(user);
-      } catch (e) {
-        setPin("");
-        throw e;
-      }
-    }, t("errorSignIn"));
+      },
+      "errorSignIn",
+      () => setPin(""),
+    );
   }
 
   function finish(fullAgain: string) {
@@ -158,21 +207,45 @@ export default function Login({
       setStep("newPin");
       return;
     }
-    void run(async () => {
-      const { token, user } =
-        flow === "register"
-          ? await api.register({
-              phone: digitsOf(phone),
-              code,
-              name: name.trim(),
-              homeState,
-              pin: newPin,
-              language,
-            })
-          : await api.resetPin({ phone: digitsOf(phone), code, pin: newPin });
-      storeSession(token, user);
-      onSignedIn(user);
-    }, t("errorFinish"));
+    submit(code);
+  }
+
+  /**
+   * Send everything the worker gave. The code is passed in, because after a
+   * wrong code it is the one he has just typed, newer than the saved state.
+   */
+  function submit(withCode: string) {
+    void run(
+      async () => {
+        const { token, user } =
+          flow === "register"
+            ? await api.register({
+                phone: digitsOf(phone),
+                code: withCode,
+                name: name.trim(),
+                homeState,
+                pin: newPin,
+                language,
+              })
+            : await api.resetPin({ phone: digitsOf(phone), code: withCode, pin: newPin });
+        storeSession(token, user);
+        onSignedIn(user);
+      },
+      "errorFinish",
+      (failed) => {
+        // Never leave full boxes that cannot be typed into again.
+        setNewPinAgain("");
+        if (failed === "CODE_WRONG") {
+          // Only the code was wrong. Back to it, keeping the name, state and PIN.
+          setCode("");
+          setRetryingCode(true);
+          setStep("code");
+        } else if (failed === "PHONE_REGISTERED") {
+          // Someone registered this number while he was typing.
+          setStep("phone");
+        }
+      },
+    );
   }
 
   const title: Record<Flow, string> = {
@@ -196,13 +269,21 @@ export default function Login({
     newPinAgain: t("typePinAgain"),
   };
 
+  /** A short line under the answer, saying what it is for. */
+  const hint = (text: string) => (
+    <p className="text-center font-body-lg text-body-lg text-on-surface-variant">{text}</p>
+  );
+
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <AppHeader title={t("appTitle")}>
         <LanguagePicker />
       </AppHeader>
 
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-space-xl px-margin pt-space-xl pb-space-2xl">
+      {/* Two blocks: the question and its answer at the top, and the ways out
+          with the note for staff at the foot of the screen (mt-auto), so a
+          tall phone does not show the answer floating over empty space. */}
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-space-xl px-margin pt-space-xl pb-space-xl">
         <div className="flex flex-col gap-space-xs">
           {/* After the phone screen, the flow's name sits above the question,
               so a worker halfway through "Forgot PIN" still knows where he is. */}
@@ -224,6 +305,7 @@ export default function Login({
           >
             <TextField
               label={t("phoneNumber")}
+              hint={t("phoneHint")}
               prefix="+91"
               type="tel"
               numeric
@@ -241,27 +323,37 @@ export default function Login({
         )}
 
         {step === "pin" && (
-          <DigitBoxes
-            label={t("pinLabel")}
-            length={4}
-            value={pin}
-            onChange={setPin}
-            onComplete={signIn}
-            secret
-            autoFocus
-            disabled={busy}
-          />
+          <div className="flex flex-col gap-space-lg">
+            <DigitBoxes
+              label={t("pinLabel")}
+              length={4}
+              value={pin}
+              onChange={setPin}
+              onComplete={signIn}
+              secret
+              autoFocus
+              disabled={busy}
+            />
+            {hint(t("pinHint"))}
+          </div>
         )}
 
         {step === "code" && (
-          <DigitBoxes
-            label={t("codeLabel")}
-            length={6}
-            value={code}
-            onChange={setCode}
-            onComplete={() => setStep(flow === "register" ? "name" : "newPin")}
-            autoFocus
-          />
+          <div className="flex flex-col gap-space-lg">
+            <DigitBoxes
+              label={t("codeLabel")}
+              length={6}
+              value={code}
+              onChange={setCode}
+              onComplete={(typed) => {
+                if (retryingCode) submit(typed);
+                else setStep(flow === "register" ? "name" : "newPin");
+              }}
+              autoFocus
+              disabled={busy}
+            />
+            {hint(t("codeHint", { minutes: codeMinutes }))}
+          </div>
         )}
 
         {step === "name" && (
@@ -282,6 +374,7 @@ export default function Login({
             <TextField
               label={t("yourName")}
               hideLabel
+              hint={t("nameHint")}
               autoComplete="name"
               autoFocus
               value={name}
@@ -294,7 +387,23 @@ export default function Login({
           </form>
         )}
 
-        {step === "state" && (
+        {step === "state" && statesFailed && (
+          <div className="flex flex-col gap-space-md">
+            <Note tone="error">{t("errStates")}</Note>
+            <Button variant="secondary" size="page" onClick={loadStates}>
+              {t("tryAgain")}
+            </Button>
+          </div>
+        )}
+
+        {step === "state" && !statesFailed && states.length === 0 && (
+          <p role="status" className="flex items-center justify-center gap-space-sm text-on-surface-variant">
+            <Icon name="progress_activity" spin />
+            {t("loading")}
+          </p>
+        )}
+
+        {step === "state" && states.length > 0 && (
           <ul className="flex flex-col gap-space-sm">
             {states.map((s) => (
               <li key={s.state}>
@@ -328,16 +437,19 @@ export default function Login({
         )}
 
         {step === "newPinAgain" && (
-          <DigitBoxes
-            label={t("pinAgainLabel")}
-            length={4}
-            value={newPinAgain}
-            onChange={setNewPinAgain}
-            onComplete={finish}
-            secret
-            autoFocus
-            disabled={busy}
-          />
+          <div className="flex flex-col gap-space-lg">
+            <DigitBoxes
+              label={t("pinAgainLabel")}
+              length={4}
+              value={newPinAgain}
+              onChange={setNewPinAgain}
+              onComplete={finish}
+              secret
+              autoFocus
+              disabled={busy}
+            />
+            {hint(t("pinAgainHint"))}
+          </div>
         )}
 
         {/* The digit boxes are disabled while the server answers, and without
@@ -352,37 +464,35 @@ export default function Login({
           </p>
         )}
 
-        {step !== "phone" && (
-          <div className="flex justify-center">
+        <div className="mt-auto flex flex-col gap-space-sm border-t border-outline-variant pt-space-lg">
+          {/* The other flows are offered only before the phone is given. After
+              that, "Start again" is the only way out, so the screen still asks
+              one thing. */}
+          {step === "phone" ? (
+            <>
+              {flow !== "register" && (
+                <Button variant="secondary" size="page" onClick={() => start("register")}>
+                  {t("makeAccount")}
+                </Button>
+              )}
+              {flow !== "reset" && (
+                <Button variant="ghost" onClick={() => start("reset")}>
+                  {t("forgotPin")}
+                </Button>
+              )}
+              {flow !== "signin" && (
+                <Button variant="ghost" onClick={() => start("signin")}>
+                  {t("havePin")}
+                </Button>
+              )}
+            </>
+          ) : (
             <Button variant="ghost" icon="arrow_back" onClick={() => start(flow)}>
               {t("startAgain")}
-            </Button>
-          </div>
-        )}
-
-        {/* The other flows are offered only before the phone is given. After
-            that, "Start again" is the only way out, so the screen still asks
-            one thing. */}
-        {step === "phone" && (
-        <div className="flex flex-col gap-space-sm border-t border-outline-variant pt-space-lg">
-          {flow !== "register" && (
-            <Button variant="secondary" size="page" onClick={() => start("register")}>
-              {t("makeAccount")}
-            </Button>
-          )}
-          {flow !== "reset" && (
-            <Button variant="ghost" onClick={() => start("reset")}>
-              {t("forgotPin")}
-            </Button>
-          )}
-          {flow !== "signin" && (
-            <Button variant="ghost" onClick={() => start("signin")}>
-              {t("havePin")}
             </Button>
           )}
           <Note tone="info">{t("staffNote")}</Note>
         </div>
-        )}
       </main>
     </div>
   );
