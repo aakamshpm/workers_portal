@@ -106,6 +106,8 @@ describe.each([
   it("stays English with no language choice, even for a Malayalam account", () => {
     open(App, person(role, "ml"));
     expect(screen.queryByRole("combobox", { name: /language/i })).toBeNull();
+    // The contractor's "Sign out" is behind his account button; the officer's is in the header.
+    if (role === "CONTRACTOR") fireEvent.click(screen.getByRole("button", { name: en.yourAccount }));
     expect(screen.getByRole("button", { name: en.signOut })).toBeTruthy();
     expect(document.documentElement.lang).not.toBe("ml");
   });

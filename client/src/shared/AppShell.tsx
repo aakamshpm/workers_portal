@@ -55,10 +55,10 @@ export function useAppSession(role: Role): AuthUser | null {
  * app's first tab, so a mistyped address stays inside the app.
  */
 export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
-  // The worker app has the design's phone layout (W1). The contractor and
-  // officer apps keep the older header until their own screens are rebuilt;
-  // the officer's is a desktop website and waits for its sidebar ADR.
-  if (user.role === "WORKER") return <WorkerFrame user={user} tabs={tabs}>{children}</WorkerFrame>;
+  // The worker and contractor apps are used on a phone and share the design's
+  // phone layout (W1). The officer's is a desktop website: it keeps the older
+  // header until its sidebar ADR.
+  if (user.role !== "AUTHORITY") return <PhoneFrame user={user} tabs={tabs}>{children}</PhoneFrame>;
   return <StaffFrame user={user} tabs={tabs}>{children}</StaffFrame>;
 }
 
@@ -68,10 +68,10 @@ function signOut() {
 }
 
 /**
- * The worker app on a phone (design W1, ADR-0019).
+ * The worker and contractor apps on a phone (design W1, ADR-0019).
  *
- * The header holds three things: the app name, the language list and one
- * button for his own account. Everything about him (name, phone, home state)
+ * The header holds the app name, the language list (only where the app has
+ * one: the worker app) and one button for his own account. Everything about him (name, phone, home state)
  * and "Sign out" sits behind that button, so the header fits a 320px phone in
  * every language, and "Sign out" is never next to a thumb by accident.
  *
@@ -79,7 +79,7 @@ function signOut() {
  * reaches. It comes after <main> in the page, so a screen reader reads the
  * screen first, and <main> keeps room under its last line for the bar.
  */
-function WorkerFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
+function PhoneFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
   const { t } = useT();
   const canInstall = useCanInstall();
 
@@ -105,7 +105,11 @@ function WorkerFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; ch
         aria-label={t("sections")}
         className="fixed inset-x-0 bottom-0 z-10 bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_var(--color-outline-variant)] backdrop-blur"
       >
-        <ul className="mx-auto grid min-h-[var(--size-bottom-nav)] max-w-2xl grid-cols-4">
+        <ul
+          className="mx-auto grid min-h-[var(--size-bottom-nav)] max-w-2xl"
+          // One equal column per section: four for the worker, three for the contractor.
+          style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+        >
           {tabs.map((tab) => (
             <li key={tab.path} className="flex">
               <NavLink
@@ -142,7 +146,7 @@ function WorkerFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; ch
 }
 
 /**
- * The worker's own account: one round button, and a small panel under it with
+ * The reader's own account: one round button, and a small panel under it with
  * his name, phone, home state and "Sign out".
  *
  * The panel is a non-modal dialog. Escape or a tap outside closes it, and
@@ -201,9 +205,10 @@ function AccountButton({ user }: { user: AuthUser }) {
           <div className="flex flex-col gap-space-xs">
             <p className="font-headline-sm text-headline-sm break-words text-on-surface">{user.name}</p>
             <p className="font-label-md text-label-md text-on-surface-variant">
-              {t("roleWorker")}
+              {user.role === "WORKER" ? t("roleWorker") : ROLE_LABEL[user.role]}
               {user.homeState ? ` · ${stateName(t, user.homeState)}` : ""}
             </p>
+            {user.company && <p className="font-label-md text-label-md text-on-surface-variant">{user.company}</p>}
             <p className="font-body-lg text-body-lg whitespace-nowrap text-on-surface">
               +91&nbsp;{formatPhone(user.phone)}
             </p>
@@ -217,7 +222,7 @@ function AccountButton({ user }: { user: AuthUser }) {
   );
 }
 
-/** The contractor app and the officer website, unchanged until they are rebuilt. */
+/** The officer website, unchanged until its sidebar ADR. */
 function StaffFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
   // English unless the app mounts an I18nProvider. Only the worker app does (ADR-0015).
   const { t } = useT();

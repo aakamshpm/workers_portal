@@ -12,9 +12,9 @@ import PaymentProofPage from "./PaymentProofPage";
  * complaint desk here.
  */
 const TABS: Tab[] = [
-  { path: "workers", label: "My workers" },
-  { path: "pay", label: "Pay a worker" },
-  { path: "records", label: "All records" },
+  { path: "workers", label: "My workers", icon: "groups" },
+  { path: "pay", label: "Pay a worker", icon: "payments" },
+  { path: "records", label: "All records", icon: "receipt_long" },
 ];
 
 export default function ContractorApp() {

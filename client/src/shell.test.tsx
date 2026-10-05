@@ -16,8 +16,10 @@ import type { AuthUser, Role } from "./shared/types";
  *   reaches, each with an icon and a name, and none is cut off;
  * - the current section is marked for a screen reader, not only by colour.
  *
- * And for the contractor and officer apps: they keep their header with the
- * name and a visible "Sign out", because their layout is redesigned later.
+ * The contractor app has the same frame (header of two things and one account
+ * button, three sections at the foot), without a language list. The officer
+ * website keeps its header with the name and a visible "Sign out", because
+ * it is a desktop site and waits for its sidebar ADR.
  *
  * The API module is mocked. No test reaches the server.
  */
@@ -36,6 +38,7 @@ import { leaveTo } from "./shared/leave";
 import { DICTIONARIES } from "./shared/i18n";
 import WorkerApp from "./worker/App";
 import ContractorApp from "./contractor/App";
+import OfficerApp from "./officer/App";
 
 const WORKER: AuthUser = {
   id: "w1",
@@ -140,16 +143,92 @@ describe("worker app sections", () => {
   });
 });
 
+const CONTRACTOR: AuthUser = {
+  ...WORKER,
+  id: "c1",
+  name: "Ramesh Pillai",
+  phone: "9000010001",
+  role: "CONTRACTOR" as Role,
+  homeState: "Kerala",
+  company: "Ramesh Builders",
+};
+
+function openContractor(at = "/workers") {
+  vi.mocked(getStoredUser).mockReturnValue(CONTRACTOR);
+  render(
+    <MemoryRouter initialEntries={[at]}>
+      <ContractorApp />
+    </MemoryRouter>,
+  );
+}
+
 describe("contractor app header", () => {
-  it("keeps the name and a visible Sign out, and its tabs at the top", () => {
-    vi.mocked(getStoredUser).mockReturnValue({ ...WORKER, role: "CONTRACTOR", name: "Ramesh Pillai" });
+  it("holds the app name and one account button, like the worker app, so it fits a 320px phone", () => {
+    openContractor();
+    const header = screen.getByRole("banner");
+    expect(header.textContent).toContain("Worker Pay Record");
+    expect(within(header).getAllByRole("button")).toHaveLength(1);
+    expect(within(header).getByRole("button", { name: /your account/i })).toBeTruthy();
+    // The name block, the tagline and a bare "Sign out" are what wrapped into four lines.
+    expect(header.textContent).not.toContain("Ramesh Pillai");
+    expect(header.textContent).not.toContain(DICTIONARIES.en.appTagline);
+    expect(within(header).queryByRole("navigation")).toBeNull();
+  });
+
+  it("shows his name, role, state, business, phone and Sign out only behind the account button", () => {
+    openContractor();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /your account/i }));
+    const menu = screen.getByRole("dialog", { name: /your account/i });
+    expect(menu.textContent).toContain("Ramesh Pillai");
+    expect(menu.textContent).toContain("Contractor");
+    expect(menu.textContent).toContain("Kerala");
+    expect(menu.textContent).toContain("Ramesh Builders");
+    expect(menu.textContent).toContain("90000\u00a010001");
+    fireEvent.click(within(menu).getByRole("button", { name: "Sign out" }));
+    expect(clearSession).toHaveBeenCalledOnce();
+    expect(leaveTo).toHaveBeenCalledWith("/");
+  });
+
+  it("has no language list, because the contractor app is English", () => {
+    openContractor();
+    expect(within(screen.getByRole("banner")).queryByRole("combobox")).toBeNull();
+  });
+});
+
+describe("contractor app sections", () => {
+  it("are one bar of three at the foot of the screen, each with an icon, none cut off", () => {
+    openContractor();
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual(["My workers", "Pay a worker", "All records"]);
+    expect(nav.className).toContain("fixed");
+    expect(nav.className).toContain("bottom-0");
+    for (const a of links) expect(a.querySelector("svg")).not.toBeNull();
+    // Three columns, not the worker's four: the tabs share the width equally.
+    expect(nav.querySelector("ul")!.getAttribute("style")).toContain("repeat(3");
+    const main = screen.getByRole("main");
+    expect(main.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(main.className).toContain("pb-[calc(var(--size-bottom-nav)+var(--spacing-space-xl))]");
+  });
+
+  it("mark the open section for a screen reader", () => {
+    openContractor("/pay");
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "Pay a worker" }).getAttribute("aria-current")).toBe("page");
+  });
+});
+
+describe("officer website header", () => {
+  it("keeps the name and a visible Sign out, and its tabs at the top, until its own redesign", () => {
+    vi.mocked(getStoredUser).mockReturnValue({ ...WORKER, role: "AUTHORITY", name: "Anita Joseph" });
     render(
       <MemoryRouter>
-        <ContractorApp />
+        <OfficerApp />
       </MemoryRouter>,
     );
     const header = screen.getByRole("banner");
-    expect(header.textContent).toContain("Ramesh Pillai");
+    expect(header.textContent).toContain("Anita Joseph");
     expect(within(header).getByRole("button", { name: "Sign out" })).toBeTruthy();
     expect(within(header).getByRole("navigation")).toBeTruthy();
   });

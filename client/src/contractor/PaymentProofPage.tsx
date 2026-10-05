@@ -110,21 +110,27 @@ export default function PaymentProofPage({
             >
               {balances.map((b) => (
                 <option key={b.offerId} value={b.offerId}>
-                  {b.worker.name} · {b.siteName} · you owe {formatRupees(Math.max(0, b.balance))}
+                  {b.worker.name} · {b.siteName}
                 </option>
               ))}
             </select>
           </Field>
 
-          {chosen && chosen.balance > 0 && (
-            <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              {chosen.worker.name} has earned {formatRupees(chosen.earned)} and been paid{" "}
-              {formatRupees(chosen.paid)}, leaving{" "}
-              <span className="font-semibold tabular-nums text-slate-900">
-                {formatRupees(chosen.balance)}
-              </span>{" "}
-              outstanding.
-            </div>
+          {chosen && (
+            <p className="rounded-xl bg-surface-container px-space-md py-space-sm font-body-lg text-body-lg text-on-surface-variant">
+              {chosen.balance > 0 ? (
+                <>
+                  {chosen.worker.name} has earned {formatRupees(chosen.earned)} and been paid{" "}
+                  {formatRupees(chosen.paid)}, leaving{" "}
+                  <span className="font-body-lg-bold text-body-lg-bold whitespace-nowrap tabular-nums text-on-surface">
+                    {formatRupees(chosen.balance)}
+                  </span>{" "}
+                  outstanding.
+                </>
+              ) : (
+                <>Nothing is outstanding for {chosen.worker.name}.</>
+              )}
+            </p>
           )}
 
           {pending ? (
@@ -134,7 +140,11 @@ export default function PaymentProofPage({
               for the code to expire.
             </InfoNote>
           ) : (
-            <div className="flex flex-wrap gap-1 rounded-md bg-slate-100 p-1 text-xs">
+            <div
+              role="group"
+              aria-label="How you paid"
+              className="grid grid-cols-3 gap-space-xs rounded-xl bg-surface-container p-space-xs max-[359px]:grid-cols-1"
+            >
               {(
                 [
                   { id: "CASH_CODE", label: "Cash, with a code" },
@@ -146,8 +156,11 @@ export default function PaymentProofPage({
                   key={m.id}
                   type="button"
                   onClick={() => setMethod(m.id)}
-                  className={`flex-1 rounded px-3 py-1.5 font-medium transition ${
-                    method === m.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"
+                  aria-pressed={method === m.id}
+                  className={`min-h-[var(--size-touch)] rounded-lg px-space-xs py-space-xs text-center font-label-md text-label-md leading-tight transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    method === m.id
+                      ? "bg-surface-container-lowest font-semibold text-primary shadow-sm ring-1 ring-primary"
+                      : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
                   {m.label}
@@ -179,9 +192,9 @@ export default function PaymentProofPage({
         {history.length === 0 ? (
           <EmptyState>No payments recorded yet.</EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-outline-variant">
             {history.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-3">
+              <li key={p.id} className="flex flex-col gap-space-sm px-5 py-3">
                 <div>
                   <p className="text-sm font-medium text-slate-900">
                     {formatRupees(p.amount)}{" "}
@@ -203,7 +216,7 @@ export default function PaymentProofPage({
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
+                <div className="flex flex-wrap items-center gap-space-xs">
                   <EvidenceBadge evidence={p.evidence} />
                   <ConfirmBadge state={p.confirmState} />
                 </div>
