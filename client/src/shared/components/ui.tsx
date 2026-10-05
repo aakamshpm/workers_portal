@@ -147,6 +147,7 @@ export function Button({
   disabled,
   busy = false,
   full = false,
+  expanded,
   type = "button",
 }: {
   children: ReactNode;
@@ -162,6 +163,12 @@ export function Button({
    * are then the same size, so neither looks like the one to choose.
    */
   full?: boolean;
+  /**
+   * Set on a button that opens or closes a panel, so a screen reader says
+   * whether the panel is open. Left out on every other button, which must not
+   * claim to open anything.
+   */
+  expanded?: boolean;
   type?: "button" | "submit";
 }) {
   const variants = {
@@ -189,6 +196,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled || busy}
       {...(busy ? { "aria-busy": true } : {})}
+      {...(expanded !== undefined ? { "aria-expanded": expanded } : {})}
       className={`inline-flex items-center justify-center gap-space-sm rounded-xl py-space-xs text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${full ? "w-full" : ""}`}
     >
       {busy ? (
@@ -528,14 +536,25 @@ function Badge({ tone, title, children }: { tone: Tone; title?: string; children
   );
 }
 
-export function OfferBadge({ status }: { status: string }) {
+export function OfferBadge({ status, viewer = "WORKER" }: { status: string; viewer?: "WORKER" | "CONTRACTOR" }) {
   const { t } = useT();
-  const map: Record<string, { label: string; tone: Tone }> = {
-    PENDING: { label: t("offerPending"), tone: "waiting" },
-    ACCEPTED: { label: t("offerAccepted"), tone: "good" },
-    DECLINED: { label: t("offerDeclined"), tone: "neutral" },
-    CANCELLED: { label: t("offerCancelled"), tone: "neutral" },
-  };
+  // The words are the reader's own side of the offer. "Waiting for your answer"
+  // is right for the worker and wrong for the contractor, who is the one
+  // waiting. The contractor app is English (ADR-0015), so its words are literal.
+  const map: Record<string, { label: string; tone: Tone }> =
+    viewer === "CONTRACTOR"
+      ? {
+          PENDING: { label: "Waiting for the worker", tone: "waiting" },
+          ACCEPTED: { label: "Worker said yes", tone: "good" },
+          DECLINED: { label: "Worker said no", tone: "neutral" },
+          CANCELLED: { label: "You took it back", tone: "neutral" },
+        }
+      : {
+          PENDING: { label: t("offerPending"), tone: "waiting" },
+          ACCEPTED: { label: t("offerAccepted"), tone: "good" },
+          DECLINED: { label: t("offerDeclined"), tone: "neutral" },
+          CANCELLED: { label: t("offerCancelled"), tone: "neutral" },
+        };
   const it = map[status] ?? { label: status, tone: "neutral" as Tone };
   return <Badge tone={it.tone}>{it.label}</Badge>;
 }

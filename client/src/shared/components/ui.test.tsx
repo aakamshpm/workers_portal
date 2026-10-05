@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { Button, Card, ChoiceRow, EmptyState, Field, Note, PhoneLink, RecordTypeBadge, TextField, formatPhone } from "./ui";
+import { Button, Card, ChoiceRow, EmptyState, Field, Note, OfferBadge, PhoneLink, RecordTypeBadge, TextField, formatPhone } from "./ui";
 import { I18nProvider, DICTIONARIES } from "../i18n";
 
 /**
@@ -488,5 +488,38 @@ describe("RecordTypeBadge", () => {
   it("writes no colour outside the theme", () => {
     const { container } = render(<RecordTypeBadge type="DISPUTE" />);
     expect(container.innerHTML).not.toMatch(/slate-|rose-|emerald-|amber-|sky-|indigo-|lime-|teal-/);
+  });
+});
+
+describe("Button expanded", () => {
+  it("tells a screen reader whether the panel it opens is open, and says nothing when it opens none", () => {
+    const { rerender } = render(<Button expanded={false}>Offer work</Button>);
+    expect(screen.getByRole("button").getAttribute("aria-expanded")).toBe("false");
+    rerender(<Button expanded>Offer work</Button>);
+    expect(screen.getByRole("button").getAttribute("aria-expanded")).toBe("true");
+    rerender(<Button>Offer work</Button>);
+    expect(screen.getByRole("button").hasAttribute("aria-expanded")).toBe(false);
+  });
+});
+
+describe("OfferBadge for the contractor", () => {
+  it("says the worker is the one who must answer, not the reader", () => {
+    render(<OfferBadge status="PENDING" viewer="CONTRACTOR" />);
+    expect(screen.getByText("Waiting for the worker")).toBeTruthy();
+    expect(screen.queryByText("Waiting for your answer")).toBeNull();
+  });
+
+  it.each([
+    ["ACCEPTED", "Worker said yes"],
+    ["DECLINED", "Worker said no"],
+    ["CANCELLED", "You took it back"],
+  ])("words %s from the contractor's side", (status, label) => {
+    render(<OfferBadge status={status} viewer="CONTRACTOR" />);
+    expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it("keeps the worker's own wording for the worker", () => {
+    render(<OfferBadge status="PENDING" />);
+    expect(screen.getByText("Waiting for your answer")).toBeTruthy();
   });
 });
