@@ -127,7 +127,12 @@ describe("each app shows only its own tabs", () => {
     expect(tabsOf(ContractorApp, "CONTRACTOR")).toEqual(["My workers", "Pay a worker", "All records"]);
   });
 
-  it("officer: complaints, records, accounts. No hiring and no pay screens", () => {
-    expect(tabsOf(OfficerApp, "AUTHORITY")).toEqual(["Complaints", "All records", "Accounts"]);
+  it("officer: complaints, disputed records, records, accounts. No hiring and no pay screens", () => {
+    expect(tabsOf(OfficerApp, "AUTHORITY")).toEqual([
+      "Complaints",
+      "Disputed records",
+      "All records",
+      "Accounts",
+    ]);
   });
 });

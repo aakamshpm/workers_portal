@@ -19,6 +19,7 @@
     "src/entries.test.ts",
     "src/sw.test.ts",
     "src/shared/theme.test.ts",
+    "src/shared/index.test.ts",
     "src/shared/fonts.test.ts",
     "src/shared/components/icons.source.test.ts",
     "scripts/*.mjs"

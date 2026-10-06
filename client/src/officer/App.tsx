@@ -2,7 +2,8 @@ import { Route, Routes } from "react-router-dom";
 import { AppShell, FirstTab, useAppSession, type Tab } from "../shared/AppShell";
 import LedgerView from "../shared/LedgerView";
 import AccountsPage from "./AccountsPage";
-import AuthorityDashboard from "./AuthorityDashboard";
+import ComplaintsPage from "./ComplaintsPage";
+import DisputedRecordsPage from "./DisputedRecordsPage";
 
 /**
  * The labour officer website, at /officer/. ADR-0012.
@@ -12,9 +13,10 @@ import AuthorityDashboard from "./AuthorityDashboard";
  * screens here, and this bundle does not contain them.
  */
 const TABS: Tab[] = [
-  { path: "complaints", label: "Complaints" },
-  { path: "records", label: "All records" },
-  { path: "accounts", label: "Accounts" },
+  { path: "complaints", label: "Complaints", icon: "gavel" },
+  { path: "disputes", label: "Disputed records", icon: "warning" },
+  { path: "records", label: "All records", icon: "receipt_long" },
+  { path: "accounts", label: "Accounts", icon: "badge" },
 ];
 
 export default function OfficerApp() {
@@ -24,7 +26,8 @@ export default function OfficerApp() {
   return (
     <AppShell user={user} tabs={TABS}>
       <Routes>
-        <Route path="/complaints" element={<AuthorityDashboard user={user} />} />
+        <Route path="/complaints" element={<ComplaintsPage user={user} />} />
+        <Route path="/disputes" element={<DisputedRecordsPage />} />
         <Route path="/records" element={<LedgerView />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="*" element={<FirstTab tabs={TABS} />} />

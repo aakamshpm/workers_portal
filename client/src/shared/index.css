@@ -14,6 +14,22 @@
        a PIN box looks as if the wrong digit was pressed. */
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Tailwind 4 no longer gives a button the pointer hand, so a button looked
+     like plain text under a mouse. Everything a reader can press shows the
+     hand, and a control that is switched off says so. This is the base layer,
+     so a component can still choose its own cursor with a utility class. */
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* Tabular figures keep money columns and hash strings aligned down the table,

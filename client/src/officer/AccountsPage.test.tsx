@@ -182,3 +182,59 @@ describe("creating an account", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/already has an account/i);
   });
 });
+
+describe("Accounts page design (ADR-0019, ADR-0021)", () => {
+  it("has one heading, and the two cards are named for a screen reader", async () => {
+    mocked.accounts.mockResolvedValue([CONTRACTOR]);
+    render(<AccountsPage />);
+    await screen.findByText("Joseph Varghese");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Accounts");
+    expect(screen.getByRole("region", { name: "Create an account" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Contractor and officer accounts" })).toBeTruthy();
+  });
+
+  it("puts the two roles in a named group, each a full row a mouse or a finger can hit", async () => {
+    mocked.accounts.mockResolvedValue([]);
+    render(<AccountsPage />);
+    const group = await screen.findByRole("radiogroup", { name: "Role" });
+    const radios = within(group).getAllByRole("radio");
+    expect(radios).toHaveLength(2);
+    for (const r of radios) expect(r.closest("label")!.className).toContain("min-h-[var(--size-touch)]");
+  });
+
+  it("marks who can sign in and who has no PIN with the same badges as the rest of the app", async () => {
+    mocked.accounts.mockResolvedValue([CONTRACTOR, NEW_OFFICER]);
+    render(<AccountsPage />);
+    const can = await screen.findByText("Can sign in");
+    const none = screen.getByText("No PIN yet");
+    expect(can.className).toContain("bg-secondary-container");
+    expect(none.className).toContain("bg-surface-container-high");
+    expect(can.className).toContain("whitespace-nowrap");
+  });
+
+  it("writes the phone number with a no-break space, so it never splits over two lines", async () => {
+    mocked.accounts.mockResolvedValue([CONTRACTOR]);
+    render(<AccountsPage />);
+    await screen.findByText("Joseph Varghese");
+    // getByText folds a no-break space into a plain one, so compare the raw text.
+    const line = Array.from(document.querySelectorAll("p")).find((e) => e.textContent?.includes("94470"))!;
+    expect(line.textContent).toContain("94470\u00a012345");
+  });
+
+  it("puts the badge under the name on a narrow page instead of at the far edge", async () => {
+    mocked.accounts.mockResolvedValue([CONTRACTOR]);
+    render(<AccountsPage />);
+    const row = (await screen.findByText("Joseph Varghese")).closest("li")!;
+    expect(row.className).toContain("flex-col");
+    expect(row.className).toContain("sm:flex-row");
+  });
+
+  it("uses no colour outside the theme", async () => {
+    mocked.accounts.mockResolvedValue([CONTRACTOR, NEW_OFFICER]);
+    const { container } = render(<AccountsPage />);
+    await screen.findByText("Joseph Varghese");
+    fill(/^name/i, "Ravi");
+    expect(container.innerHTML).not.toMatch(/(slate|rose|emerald|sky|amber|red|green|blue|violet)-\d/);
+  });
+});

@@ -522,10 +522,10 @@ const TONE = {
   neutral: "bg-surface-container text-on-surface-variant",
   info: "bg-tertiary-container text-on-tertiary-container",
 } as const;
-type Tone = keyof typeof TONE;
+export type Tone = keyof typeof TONE;
 
 /** A short status word. It never wraps, because a badge broken over two lines reads as two badges. */
-function Badge({ tone, title, children }: { tone: Tone; title?: string; children: ReactNode }) {
+export function Badge({ tone, title, children }: { tone: Tone; title?: string; children: ReactNode }) {
   return (
     <span
       {...(title ? { title } : {})}

@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { api } from "../shared/api";
 import type { Account } from "../shared/types";
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
-  ErrorNote,
   Field,
   formatDate,
   formatPhone,
   inputClass,
-  SuccessNote,
+  Note,
 } from "../shared/components/ui";
 
 /**
@@ -77,23 +77,36 @@ export default function AccountsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex max-w-5xl flex-col gap-space-lg">
+      <header className="flex flex-col gap-space-xs">
+        <h1 className="font-headline-lg text-headline-lg text-on-surface">Accounts</h1>
+        <p className="font-body-lg text-body-lg text-on-surface-variant">
+          Contractors and labour officers are made here, by the labour office.
+        </p>
+      </header>
+
       <Card
         title="Create an account"
         description="For a contractor or a labour officer. Workers make their own account on the sign-in page."
       >
-        <form className="space-y-4 px-5 py-4" onSubmit={(e) => void create(e)}>
-          <fieldset>
-            <legend className="mb-1 text-xs font-medium text-slate-700">Role</legend>
-            <div className="flex gap-4">
+        <form className="flex max-w-2xl flex-col gap-space-md px-space-lg py-space-md" onSubmit={(e) => void create(e)}>
+          <fieldset role="radiogroup" className="flex flex-col gap-space-sm">
+            <legend className="mb-space-xs font-body-lg-medium text-body-lg-medium text-on-surface">Role</legend>
+            <div className="flex flex-wrap gap-space-sm">
               {(Object.keys(ROLE_LABEL) as NewRole[]).map((r) => (
-                <label key={r} className="flex items-center gap-2 text-sm text-slate-800">
+                <label
+                  key={r}
+                  className={`flex min-h-[var(--size-touch)] cursor-pointer items-center gap-space-sm rounded-xl px-space-md font-body-lg text-body-lg text-on-surface ring-1 ring-inset focus-within:ring-2 focus-within:ring-primary ${
+                    role === r ? "bg-secondary-container ring-primary" : "ring-outline"
+                  }`}
+                >
                   <input
                     type="radio"
                     name="role"
                     value={r}
                     checked={role === r}
                     onChange={() => setRole(r)}
+                    className="size-5 accent-primary"
                   />
                   {ROLE_LABEL[r]}
                 </label>
@@ -101,7 +114,7 @@ export default function AccountsPage() {
             </div>
           </fieldset>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-space-md sm:grid-cols-2">
             <Field label="Name">
               <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
             </Field>
@@ -127,50 +140,49 @@ export default function AccountsPage() {
             )}
           </div>
 
-          {error && <ErrorNote message={error} />}
+          {error && <Note tone="error">{error}</Note>}
           {created && (
-            <SuccessNote>
+            <Note tone="success">
               Account made for {created.name}. There is no PIN yet. Ask {created.name} to open the
               sign-in page, tap “Forgot PIN?” and type the code that comes by SMS to{" "}
               {formatPhone(created.phone)}.
-            </SuccessNote>
+            </Note>
           )}
 
-          <Button type="submit" disabled={busy}>
-            {busy ? "Creating…" : "Create account"}
-          </Button>
+          <div>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Creating…" : "Create account"}
+            </Button>
+          </div>
         </form>
       </Card>
 
       <Card title="Contractor and officer accounts">
         {loadError ? (
-          <div className="px-5 py-4">
-            <ErrorNote message={loadError} />
+          <div className="px-space-lg py-space-md">
+            <Note tone="error">{loadError}</Note>
           </div>
         ) : accounts === null ? (
           <EmptyState>Loading accounts…</EmptyState>
         ) : accounts.length === 0 ? (
           <EmptyState>No contractor or officer accounts yet.</EmptyState>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-outline-variant">
             {accounts.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+              <li
+                key={a.id}
+                className="flex flex-col items-start gap-space-sm px-space-lg py-space-md sm:flex-row sm:items-center sm:justify-between"
+              >
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{a.name}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-body-lg-medium text-body-lg-medium text-on-surface">{a.name}</p>
+                  <p className="font-label-md text-label-md text-on-surface-variant">
                     {ROLE_LABEL[a.role]} · {formatPhone(a.phone)} · added {formatDate(a.createdAt)}
                   </p>
-                  {a.company && <p className="text-xs text-slate-600">{a.company}</p>}
+                  {a.company && (
+                    <p className="font-label-md text-label-md text-on-surface-variant">{a.company}</p>
+                  )}
                 </div>
-                {a.hasPin ? (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                    Can sign in
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-                    No PIN yet
-                  </span>
-                )}
+                {a.hasPin ? <Badge tone="good">Can sign in</Badge> : <Badge tone="waiting">No PIN yet</Badge>}
               </li>
             ))}
           </ul>

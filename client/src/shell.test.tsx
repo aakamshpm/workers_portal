@@ -219,17 +219,97 @@ describe("contractor app sections", () => {
   });
 });
 
-describe("officer website header", () => {
-  it("keeps the name and a visible Sign out, and its tabs at the top, until its own redesign", () => {
-    vi.mocked(getStoredUser).mockReturnValue({ ...WORKER, role: "AUTHORITY", name: "Anita Joseph" });
-    render(
-      <MemoryRouter>
-        <OfficerApp />
-      </MemoryRouter>,
-    );
+const OFFICER: AuthUser = {
+  ...WORKER,
+  id: "o1",
+  name: "Anita Joseph",
+  phone: "9000020001",
+  role: "AUTHORITY" as Role,
+  homeState: "Kerala",
+  company: "District Labour Office, Ernakulam",
+};
+
+function openOfficer(at = "/complaints") {
+  vi.mocked(getStoredUser).mockReturnValue(OFFICER);
+  render(
+    <MemoryRouter initialEntries={[at]}>
+      <OfficerApp />
+    </MemoryRouter>,
+  );
+}
+
+describe("officer website top bar", () => {
+  it("holds the app name, his name and office, and a visible Sign out, with no account button", () => {
+    openOfficer();
     const header = screen.getByRole("banner");
+    expect(header.textContent).toContain("Worker Pay Record");
     expect(header.textContent).toContain("Anita Joseph");
+    expect(header.textContent).toContain("Labour Officer");
+    expect(header.textContent).toContain("District Labour Office, Ernakulam");
+    // He uses a mouse and has the room, so Sign out is not hidden behind a button.
     expect(within(header).getByRole("button", { name: "Sign out" })).toBeTruthy();
-    expect(within(header).getByRole("navigation")).toBeTruthy();
+    expect(within(header).queryByRole("button", { name: /your account/i })).toBeNull();
+    // The sections are in the sidebar, not in the top bar.
+    expect(within(header).queryByRole("navigation")).toBeNull();
+    expect(header.textContent).not.toContain(DICTIONARIES.en.appTagline);
+  });
+
+  it("signs out from the top bar", () => {
+    openOfficer();
+    fireEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: "Sign out" }));
+    expect(clearSession).toHaveBeenCalledOnce();
+    expect(leaveTo).toHaveBeenCalledWith("/");
+  });
+
+  it("has no language list, because the officer website is English", () => {
+    openOfficer();
+    expect(within(screen.getByRole("banner")).queryByRole("combobox")).toBeNull();
+  });
+});
+
+describe("officer website sidebar", () => {
+  it("is one list of four sections, each with an icon, outside the top bar", () => {
+    openOfficer();
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual([
+      "Complaints",
+      "Disputed records",
+      "All records",
+      "Accounts",
+    ]);
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      "/complaints",
+      "/disputes",
+      "/records",
+      "/accounts",
+    ]);
+    for (const a of links) expect(a.querySelector("svg")).not.toBeNull();
+    expect(within(screen.getByRole("banner")).queryByRole("navigation")).toBeNull();
+    expect(screen.getAllByRole("navigation")).toHaveLength(1);
+  });
+
+  it("stands beside the page from 1024px up and stays in view, and is a row below that", () => {
+    openOfficer();
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    const main = screen.getByRole("main");
+    const frame = nav.parentElement!;
+    expect(frame.contains(main)).toBe(true);
+    expect(frame.className).toContain("lg:flex-row");
+    expect(nav.className).toContain("lg:sticky");
+    expect(nav.className).toContain("lg:w-64");
+    expect(nav.querySelector("ul")!.className).toContain("lg:flex-col");
+    // A row that scrolls inside itself on a narrow tablet, never the whole page.
+    expect(nav.className).toContain("overflow-x-auto");
+    // The page may shrink, so a wide table never pushes the sidebar off the screen.
+    expect(main.className).toContain("min-w-0");
+    expect(main.className).toContain("flex-1");
+  });
+
+  it("marks the open section for a screen reader", () => {
+    openOfficer("/disputes");
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "Disputed records" }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav).getByRole("link", { name: "Complaints" }).getAttribute("aria-current")).toBeNull();
   });
 });

@@ -56,10 +56,10 @@ export function useAppSession(role: Role): AuthUser | null {
  */
 export function AppShell({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
   // The worker and contractor apps are used on a phone and share the design's
-  // phone layout (W1). The officer's is a desktop website: it keeps the older
-  // header until its sidebar ADR.
+  // phone layout (W1). The officer's is a desktop website with a sidebar
+  // (ADR-0021).
   if (user.role !== "AUTHORITY") return <PhoneFrame user={user} tabs={tabs}>{children}</PhoneFrame>;
-  return <StaffFrame user={user} tabs={tabs}>{children}</StaffFrame>;
+  return <OfficerFrame user={user} tabs={tabs}>{children}</OfficerFrame>;
 }
 
 function signOut() {
@@ -222,77 +222,74 @@ function AccountButton({ user }: { user: AuthUser }) {
   );
 }
 
-/** The officer website, unchanged until its sidebar ADR. */
-function StaffFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
-  // English unless the app mounts an I18nProvider. Only the worker app does (ADR-0015).
+/**
+ * The labour officer's website (design O1 to O5, ADR-0021).
+ *
+ * A top bar with the app name, his name and office, and a visible "Sign out":
+ * he uses a mouse and has the room, so his account is not hidden behind a
+ * button as it is on a phone. The four sections are a sidebar at the left from
+ * 1024px up, kept in view while the page scrolls. Below 1024px the same list
+ * becomes a row under the top bar that scrolls inside itself.
+ *
+ * It is one <nav>, not one for each width, so a screen reader finds the
+ * sections once. <main> may shrink (`min-w-0`), so a wide table inside it
+ * scrolls inside its own box and never pushes the sidebar off the screen.
+ *
+ * The officer website is never installable (ADR-0012): no install button here.
+ */
+function OfficerFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; children?: ReactNode }) {
+  // English: the officer website has no language list (ADR-0015).
   const { t } = useT();
-  // After the browser offers to install (ADR-0018). The officer app never
-  // listens and has no manifest, and the role check keeps the button out of
-  // it even if an offer were ever kept, since this header is shared.
-  const canInstall = useCanInstall() && user.role !== "AUTHORITY";
-  const roleLabel = ROLE_LABEL[user.role];
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-3.5">
-          <div>
-            <h1 className="text-sm font-semibold tracking-tight text-slate-900">{t("appTitle")}</h1>
-            <p className="text-xs text-slate-500">{t("appTagline")}</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {canInstall && (
-              <button
-                type="button"
-                onClick={() => void install()}
-                className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
-                  <path d="M10 2a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42L9 11.6V3a1 1 0 0 1 1-1ZM4 15a1 1 0 0 1 1 1v1h10v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" />
-                </svg>
-                {t("installApp")}
-              </button>
-            )}
-            <LanguagePicker />
-            <div className="text-right">
-              <p className="text-sm font-medium text-slate-900">{user.name}</p>
-              <p className="text-xs text-slate-500">
-                {roleLabel}
-                {user.homeState ? ` · ${user.homeState}` : ""}
-                {user.company ? ` · ${user.company}` : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={signOut}
-              className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50"
-            >
-              {t("signOut")}
-            </button>
-          </div>
+    <div className="min-h-screen bg-surface">
+      <AppHeader title={t("appTitle")}>
+        <div className="text-right">
+          <p className="font-body-lg-medium text-body-lg-medium text-on-surface">{user.name}</p>
+          <p className="font-label-md text-label-md text-on-surface-variant max-[639px]:hidden">
+            {ROLE_LABEL[user.role]}
+            {user.company ? ` · ${user.company}` : ""}
+          </p>
         </div>
+        <Button variant="secondary" size="dense" icon="logout" onClick={signOut}>
+          {t("signOut")}
+        </Button>
+      </AppHeader>
 
-        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6" aria-label={t("sections")}>
-          {tabs.map((t) => (
-            <NavLink
-              key={t.path}
-              to={`/${t.path}`}
-              className={({ isActive }) =>
-                `-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${
-                  isActive
-                    ? "border-slate-900 text-slate-900"
-                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                }`
-              }
-            >
-              {t.label}
-            </NavLink>
-          ))}
+      <div className="mx-auto flex max-w-7xl flex-col lg:flex-row">
+        <nav
+          aria-label={t("sections")}
+          className="overflow-x-auto border-b border-outline-variant lg:sticky lg:top-[var(--size-header)] lg:w-64 lg:shrink-0 lg:self-start lg:overflow-visible lg:border-b-0 lg:p-space-md"
+        >
+          <ul className="flex gap-space-xs p-space-sm lg:flex-col lg:p-0">
+            {tabs.map((tab) => (
+              <li key={tab.path} className="shrink-0">
+                <NavLink
+                  to={`/${tab.path}`}
+                  className={({ isActive }) =>
+                    `flex min-h-[var(--size-touch)] items-center gap-space-sm rounded-xl px-space-md font-body-lg-medium text-body-lg-medium whitespace-nowrap transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                      isActive
+                        ? "bg-primary-container text-on-primary"
+                        : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {tab.icon && <Icon name={tab.icon} size={22} filled={isActive} />}
+                      <span>{tab.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
         </nav>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6">{children ?? <Outlet />}</main>
+        <main className="min-w-0 flex-1 px-margin py-space-lg lg:px-margin-desktop">
+          {children ?? <Outlet />}
+        </main>
+      </div>
     </div>
   );
 }
