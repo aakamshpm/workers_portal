@@ -313,3 +313,16 @@ describe("officer website sidebar", () => {
     expect(within(nav).getByRole("link", { name: "Complaints" }).getAttribute("aria-current")).toBeNull();
   });
 });
+
+describe("page height", () => {
+  it.each([
+    ["worker", () => openWorker()],
+    ["contractor", () => openContractor()],
+    ["officer", () => openOfficer()],
+  ])("the %s app fills the visible screen, not the tallest one the browser could show", (_name, open) => {
+    open();
+    const frame = screen.getByRole("banner").parentElement!;
+    expect(frame.className).toContain("min-h-dvh");
+    expect(frame.className).not.toContain("min-h-screen");
+  });
+});

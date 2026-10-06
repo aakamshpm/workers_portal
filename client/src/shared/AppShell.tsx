@@ -84,7 +84,7 @@ function PhoneFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; chi
   const canInstall = useCanInstall();
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-dvh bg-surface">
       <AppHeader title={t("appTitle")}>
         <LanguagePicker compact />
         <AccountButton user={user} />
@@ -242,7 +242,7 @@ function OfficerFrame({ user, tabs, children }: { user: AuthUser; tabs: Tab[]; c
   const { t } = useT();
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-dvh bg-surface">
       <AppHeader title={t("appTitle")}>
         <div className="text-right">
           <p className="font-body-lg-medium text-body-lg-medium text-on-surface">{user.name}</p>

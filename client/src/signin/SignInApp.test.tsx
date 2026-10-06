@@ -452,6 +452,15 @@ describe("when something goes wrong", () => {
     expect(screen.getByRole("button", { name: en.makeAccount })).toBeTruthy();
   });
 
+  it("fills the visible screen of a phone, not the tallest one its browser could show", () => {
+    // 100vh is the height with the address bar hidden. With the bar showing,
+    // the foot of the page ("Forgot PIN?") was below the edge of the screen.
+    const { container } = render(<SignInApp />);
+    const page = container.firstElementChild!;
+    expect(page.className).toContain("min-h-dvh");
+    expect(page.className).not.toContain("min-h-screen");
+  });
+
   it("shows the error in the reader's language, not the server's English", async () => {
     localStorage.setItem("wage-ledger-language", "ml");
     mocked.login.mockRejectedValue(refused("WRONG_PIN", 401));

@@ -265,7 +265,7 @@ export default function Login({
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface">
+    <div className="flex min-h-dvh flex-col bg-surface">
       <AppHeader title={t("appTitle")}>
         <LanguagePicker />
       </AppHeader>
