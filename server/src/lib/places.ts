@@ -43,6 +43,13 @@ const TOWN_LAYERS = ["city", "locality", "district"] as const;
 
 const MAX_PLACES = 8;
 
+/**
+ * How long the server waits for Photon (ADR-0010). The public Photon answered in
+ * 3.5 to 8 seconds when measured, so a limit of 4 seconds ended most searches
+ * early and showed the worker the 14 district towns instead.
+ */
+const PHOTON_TIMEOUT_MS = 10_000;
+
 /** Photon's policy asks every client to identify itself. */
 const USER_AGENT = "workers-portal/1.0 (+https://github.com/aakamshpm/workers_portal)";
 
@@ -68,7 +75,7 @@ export class PhotonPlaceProvider implements PlaceProvider {
 
   constructor(options: { baseUrl?: string; timeoutMs?: number } = {}) {
     this.baseUrl = options.baseUrl ?? process.env.PHOTON_BASE_URL ?? "https://photon.komoot.io";
-    this.timeoutMs = options.timeoutMs ?? 4000;
+    this.timeoutMs = options.timeoutMs ?? PHOTON_TIMEOUT_MS;
   }
 
   async search(q: string): Promise<Place[]> {

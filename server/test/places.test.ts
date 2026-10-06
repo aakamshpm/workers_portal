@@ -214,6 +214,8 @@ describe("PhotonPlaceProvider", () => {
   let server: Server;
   let lastQuery: Record<string, unknown> = {};
   let mode: "normal" | "hang" = "normal";
+  /** How long the fake search waits before it answers. */
+  let delaySearchMs = 0;
   let reverseFeatures: unknown[] = [];
   /** When set, the fake search answers with these instead of the default list. */
   let searchFeatures: unknown[] | null = null;
@@ -239,7 +241,7 @@ describe("PhotonPlaceProvider", () => {
       lastQuery = req.query;
       if (mode === "hang") return; // never responds
       if (searchFeatures) return res.json({ type: "FeatureCollection", features: searchFeatures });
-      res.json({
+      const answer = () => res.json({
         type: "FeatureCollection",
         features: [
           // Photon writes the state in lower case for some towns.
@@ -249,6 +251,8 @@ describe("PhotonPlaceProvider", () => {
           feature("Perumkavu", "Kerala", "Kottayam", 9.5676, 76.5747),
         ],
       });
+      if (delaySearchMs > 0) setTimeout(answer, delaySearchMs);
+      else answer();
     });
     app.get("/reverse", (req, res) => {
       lastQuery = req.query;
@@ -262,6 +266,7 @@ describe("PhotonPlaceProvider", () => {
   // answers to the next test.
   beforeEach(() => {
     mode = "normal";
+    delaySearchMs = 0;
     searchFeatures = null;
     reverseFeatures = [];
   });
@@ -389,6 +394,16 @@ describe("PhotonPlaceProvider", () => {
 
     const place = await new PhotonPlaceProvider({ baseUrl: base }).nearest(13.08, 80.27);
     assert.equal(place, null);
+  });
+
+  it("waits for a slow Photon instead of replacing its answer with the district towns", async () => {
+    // Measured on 6 Oct 2026: the public Photon answered in 3.5 to 8 seconds.
+    // A limit of 4 seconds ended most searches early, so the worker was shown
+    // the 14 district towns, or "No town found", for names Photon knew.
+    const { PhotonPlaceProvider } = await import("../src/lib/places.js");
+    delaySearchMs = 4300;
+    const places = await new PhotonPlaceProvider({ baseUrl: base }).search("perum");
+    assert.ok(places.some((p) => p.name === "Perumbavoor"));
   });
 
   it("gives up after the timeout instead of hanging the worker's page", async () => {

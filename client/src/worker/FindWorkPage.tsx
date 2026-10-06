@@ -268,7 +268,7 @@ export default function FindWorkPage() {
 
             {lookingUp && (
               <p role="status" className="font-label-md text-label-md text-on-surface-variant">
-                Looking for towns…
+                Looking for towns… this can take a few seconds.
               </p>
             )}
 
@@ -279,8 +279,15 @@ export default function FindWorkPage() {
               </InfoNote>
             )}
 
+            {/* "No town found" is true only when the full search ran. After a
+                fallback, only the 14 district towns were checked, so saying no
+                town exists would be false. */}
             {!lookingUp && typed.trim().length >= 2 && options.length === 0 && (
-              <p className="font-body-lg text-body-lg text-on-surface-variant">No town found. Try fewer letters.</p>
+              <p className="font-body-lg text-body-lg text-on-surface-variant">
+                {optionsSource === "fallback"
+                  ? "Town search did not answer in time, so only the district towns were checked. None matched. Try again in a moment."
+                  : "No town found. Try fewer letters."}
+              </p>
             )}
 
             {options.length > 0 && (

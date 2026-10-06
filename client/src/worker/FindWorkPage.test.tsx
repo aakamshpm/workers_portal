@@ -228,6 +228,41 @@ describe("FindWorkPage", () => {
     expect(await screen.findByText(/only district towns/i)).toBeTruthy();
   });
 
+  it("does not say no town exists when only the district towns were checked", async () => {
+    mocked.discoveryMe.mockResolvedValue(NEVER_OPTED_IN);
+    mocked.searchPlaces.mockResolvedValue({ places: [], source: "fallback" });
+    render(<FindWorkPage />);
+
+    const box = await screen.findByRole("searchbox", { name: /type the name of your town/i });
+    fireEvent.change(box, { target: { value: "aluva" } });
+
+    expect(await screen.findByText(/only the district towns were checked/i)).toBeTruthy();
+    expect(screen.queryByText(/no town found/i)).toBeNull();
+  });
+
+  it("still says no town was found when the full search ran and found nothing", async () => {
+    mocked.discoveryMe.mockResolvedValue(NEVER_OPTED_IN);
+    mocked.searchPlaces.mockResolvedValue({ places: [], source: "photon" });
+    render(<FindWorkPage />);
+
+    const box = await screen.findByRole("searchbox", { name: /type the name of your town/i });
+    fireEvent.change(box, { target: { value: "zzzz" } });
+
+    expect(await screen.findByText(/no town found/i)).toBeTruthy();
+    expect(screen.queryByText(/only the district towns were checked/i)).toBeNull();
+  });
+
+  it("says the search can take a few seconds while it runs", async () => {
+    mocked.discoveryMe.mockResolvedValue(NEVER_OPTED_IN);
+    mocked.searchPlaces.mockReturnValue(new Promise(() => {}));
+    render(<FindWorkPage />);
+
+    const box = await screen.findByRole("searchbox", { name: /type the name of your town/i });
+    fireEvent.change(box, { target: { value: "aluva" } });
+
+    expect((await screen.findByRole("status")).textContent).toMatch(/few seconds/i);
+  });
+
   it("makes the worker visible only through the explicit button, with the town's name", async () => {
     mocked.discoveryMe.mockResolvedValue(NEVER_OPTED_IN);
     mocked.searchPlaces.mockResolvedValue({ places: [PERUMBAVOOR], source: "photon" });
