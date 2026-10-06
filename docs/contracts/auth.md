@@ -19,12 +19,12 @@ Every error from `/api/auth/*` has this shape:
 | `INVALID_INPUT` | 400 | A field is missing or has the wrong form |
 | `INVALID_PHONE` | 400 | The phone is not 10 digits |
 | `PHONE_REGISTERED` | 409 | A registration for a number that already has an account |
-| `PHONE_NOT_REGISTERED` | 404 | A reset for a number with no account |
+| `PHONE_NOT_REGISTERED` | 404 | A reset or a login for a number with no account |
 | `CODE_WAIT` | 429 | A code went to this number less than a minute ago |
 | `CODE_DAILY_LIMIT` | 429 | 5 codes went to this number today |
 | `SMS_FAILED` | 502 | The SMS could not be sent. Nothing was stored and the limits are not used up |
 | `CODE_WRONG` | 400 | The code is wrong, expired, used, or has had 5 wrong tries |
-| `WRONG_PIN` | 401 | The phone and PIN do not match, or the account has no PIN yet |
+| `WRONG_PIN` | 401 | The number has an account and the PIN does not match, or the account has no PIN yet |
 | `PIN_LOCKED` | 429 | 5 wrong PINs in a row. The body also has `minutesLeft` |
 
 ## POST /api/auth/code
@@ -92,7 +92,8 @@ Response `200`: `{ "token": "…", "user": { … } }` with the new `language`. T
 
 Request: `{ "phone": "9880030001", "pin": "1234" }`. Response `200`: `{ "token": "…", "user": { … } }`.
 
-- `401` `WRONG_PIN` when the phone and PIN do not match. An account that has no PIN yet answers the same; its owner sets a PIN through "Forgot PIN".
+- `404` `PHONE_NOT_REGISTERED` when the number has no account (ADR-0022). It is not counted towards the PIN lock.
+- `401` `WRONG_PIN` when the number has an account and the PIN does not match. An account that has no PIN yet answers the same; its owner sets a PIN through "Forgot PIN".
 - `429` `PIN_LOCKED` `{ "error": "…", "code": "PIN_LOCKED", "minutesLeft": 15 }` on the fifth wrong PIN in a row, and on every try until the lock ends. `minutesLeft` is the real time left, rounded up.
 
 ## GET /api/accounts

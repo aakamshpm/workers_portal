@@ -452,6 +452,32 @@ describe("when something goes wrong", () => {
     expect(screen.getByRole("button", { name: en.makeAccount })).toBeTruthy();
   });
 
+  it("tells a number with no account so, and goes back to the number with the New worker button", async () => {
+    mocked.login.mockRejectedValue(refused("PHONE_NOT_REGISTERED", 404));
+    render(<SignInApp />);
+    typePhone("9845687924");
+    await typeDigits(/pin digit/i, "0000");
+
+    expect((await screen.findByRole("alert")).textContent).toBe(en.errPhoneNotRegistered);
+    // Back on the phone step, not left on the PIN boxes with nothing to do.
+    expect(screen.queryAllByLabelText(/pin digit/i)).toHaveLength(0);
+    // The number stays in the box, so one wrong digit can be corrected.
+    expect((screen.getByLabelText(/phone number/i) as HTMLInputElement).value).toBe("9845687924");
+    expect(screen.getByRole("button", { name: en.makeAccount })).toBeTruthy();
+  });
+
+  it("says in the reader's language that the number has no account", async () => {
+    localStorage.setItem("wage-ledger-language", "ml");
+    mocked.login.mockRejectedValue(refused("PHONE_NOT_REGISTERED", 404));
+    render(<SignInApp />);
+    fireEvent.change(screen.getByLabelText(DICTIONARIES.ml.phoneNumber), { target: { value: "9845687924" } });
+    fireEvent.click(screen.getByRole("button", { name: DICTIONARIES.ml.next }));
+    await screen.findAllByRole("group");
+    const pins = document.querySelectorAll('input[type="password"]');
+    "0000".split("").forEach((d, i) => fireEvent.change(pins[i]!, { target: { value: d } }));
+    expect((await screen.findByRole("alert")).textContent).toBe(DICTIONARIES.ml.errPhoneNotRegistered);
+  });
+
   it("fills the visible screen of a phone, not the tallest one its browser could show", () => {
     // 100vh is the height with the address bar hidden. With the bar showing,
     // the foot of the page ("Forgot PIN?") was below the edge of the screen.

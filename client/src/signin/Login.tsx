@@ -185,7 +185,12 @@ export default function Login({
         onSignedIn(user);
       },
       "errorSignIn",
-      () => setPin(""),
+      (failed) => {
+        setPin("");
+        // No account for this number. The PIN boxes have nothing left to do, so
+        // go back to the number, which stays in its box for a one-digit fix.
+        if (failed === "PHONE_NOT_REGISTERED") setStep("phone");
+      },
     );
   }
 

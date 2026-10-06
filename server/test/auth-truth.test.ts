@@ -206,7 +206,7 @@ describe("sign-in routes tell the truth", () => {
       ["/api/auth/register", { phone: P.fresh, code: "123456", name: "A B", pin: "1234" }, 400, "CODE_WRONG"],
       ["/api/auth/register", { phone: P.registered, code: "123456", name: "A B", pin: "1234" }, 409, "PHONE_REGISTERED"],
       ["/api/auth/reset-pin", { phone: P.fresh, code: "123456", pin: "1234" }, 400, "CODE_WRONG"],
-      ["/api/auth/login", { phone: P.fresh, pin: "1234" }, 401, "WRONG_PIN"],
+      ["/api/auth/login", { phone: P.fresh, pin: "1234" }, 404, "PHONE_NOT_REGISTERED"],
     ];
     for (const [path, body, status, code] of cases) {
       const r = await post(path, body);
@@ -237,6 +237,29 @@ describe("sign-in routes tell the truth", () => {
     const daily = await post("/api/auth/code", { phone: P.fresh, purpose: "REGISTER" });
     assert.equal(daily.status, 429);
     assert.equal(daily.body.code, "CODE_DAILY_LIMIT");
+  });
+
+  // --- login: a number with no account (ADR-0022) ---------------------------
+
+  it("tells a number with no account that it has no account, not that the PIN is wrong", async () => {
+    const r = await post("/api/auth/login", { phone: P.fresh, pin: "1234" });
+    assert.equal(r.status, 404);
+    assert.equal(r.body.code, "PHONE_NOT_REGISTERED");
+    assert.match(r.body.error, /no account/i);
+    assert.doesNotMatch(r.body.error, /PIN/i, "the message must not blame the PIN");
+  });
+
+  it("still says the PIN is wrong for a number that has an account", async () => {
+    const r = await post("/api/auth/login", { phone: P.registered, pin: "0000" });
+    assert.equal(r.status, 401);
+    assert.equal(r.body.code, "WRONG_PIN");
+  });
+
+  it("does not count tries on a number with no account towards any lock", async () => {
+    for (let i = 0; i < 7; i++) {
+      const r = await post("/api/auth/login", { phone: P.fresh, pin: "0000" });
+      assert.equal(r.body.code, "PHONE_NOT_REGISTERED", `try ${i + 1}`);
+    }
   });
 
   // --- the PIN lock --------------------------------------------------------

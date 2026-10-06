@@ -107,19 +107,22 @@ authRouter.post("/login", async (req, res) => {
     return locked(res, user.lockedUntil);
   }
 
-  // Same message whether the number is unknown or the PIN is wrong, so the
-  // response does not reveal which numbers are registered.
+  // A number with no account is told so (ADR-0022). "Wrong phone number or
+  // PIN" hid nothing after ADR-0020, because the code route already says
+  // whether a number has an account, and it sent a worker who had mistyped one
+  // digit of his number to try other PINs.
+  if (!user) {
+    return refuse(res, 404, "PHONE_NOT_REGISTERED", "That number has no account. A new worker can make one.");
+  }
+
   // An account with no PIN yet (made by the labour office, ADR-0014) cannot
   // sign in. It answers like a wrong PIN, and it is not counted towards the
   // lock, because no PIN exists that could be guessed.
-  if (user && user.pin === null) {
+  if (user.pin === null) {
     return refuse(res, 401, "WRONG_PIN", WRONG_PIN);
   }
 
-  const ok = user?.pin ? await bcrypt.compare(parsed.data.pin, user.pin) : false;
-  if (!user) {
-    return refuse(res, 401, "WRONG_PIN", WRONG_PIN);
-  }
+  const ok = await bcrypt.compare(parsed.data.pin, user.pin);
 
   if (!ok) {
     // Counted with an atomic increment, so two wrong guesses sent at the same
