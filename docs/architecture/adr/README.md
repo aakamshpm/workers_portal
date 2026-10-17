@@ -26,3 +26,5 @@ One short file per decision. Next number after the last file. Skill: `write-adr`
 | [0020](0020-phone-code-route-tells-the-truth.md) | The phone-code route says when a number is or is not registered |
 | [0021](0021-officer-website-sidebar.md) | The officer website has a sidebar, and Disputed records is its own page |
 | [0022](0022-login-says-when-number-has-no-account.md) | The login route says when a number has no account |
+| [0023](0023-closed-complaints-stay-closed.md) | A complaint is closed once it is decided or escalated |
+| [0024](0024-handover-code-tries.md) | A handover code has five tries and comes from the operating system's random source |
