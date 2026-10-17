@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { prisma } from "./prisma";
 
 /**
@@ -833,9 +834,11 @@ export function phoneCodeMessage(code: string, language: Language): string {
  *
  * Four digits because it has to be read aloud from one phone and typed into
  * another, often in a noisy place. The short length is acceptable because the
- * code lives for minutes, works once, and is tied to one amount - guessing it
- * would require the contractor to also guess when a code exists at all.
+ * code lives for 15 minutes, works once, is tied to one amount, and five wrong
+ * tries spend it (ADR-0024).
  */
 export function generateHandoverCode(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  // randomInt reads the operating system's random source (ADR-0024). Its upper
+  // bound is exclusive, so this is 1000 to 9999.
+  return String(randomInt(1000, 10000));
 }

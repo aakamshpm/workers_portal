@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../shared/api";
+import { api, ApiError } from "../shared/api";
 import type { ContractBalance, PaymentRow, PendingCode } from "../shared/types";
 import {
   Button,
@@ -43,8 +43,10 @@ export default function PaymentProofPage({
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
 
-  const load = useCallback(async () => {
-    setError("");
+  // keepMessage: reload without clearing the message on screen, for a reload
+  // that happens because of that message, such as a code that no longer works.
+  const load = useCallback(async (keepMessage = false) => {
+    if (!keepMessage) setError("");
     try {
       const [b, h, p] = await Promise.all([
         api.balances(),
@@ -176,6 +178,10 @@ export default function PaymentProofPage({
                 pending={pending}
                 onDone={done}
                 onError={setError}
+                onCodeGone={() => {
+                  setPending(null);
+                  void load(true);
+                }}
               />
             ) : method === "TRANSFER" ? (
               <TransferForm offerId={offerId} onDone={done} onError={setError} />
@@ -241,16 +247,22 @@ export default function PaymentProofPage({
  * contractor's phone would let him sign in as the worker afterwards and confirm
  * his own records.
  */
+/** Answers after which the code can never be used again. */
+const CODE_GONE = new Set(["CODE_SPENT", "CODE_EXPIRED", "NO_CODE"]);
+
 function CashCodeFlow({
   offerId,
   pending,
   onDone,
   onError,
+  onCodeGone,
 }: {
   offerId: string;
   pending: PendingCode | null;
   onDone: (msg: string) => void;
   onError: (msg: string) => void;
+  /** The waiting code is spent or gone, so the page must reload what is waiting. */
+  onCodeGone: () => void;
 }) {
   const [amount, setAmount] = useState("");
   const [code, setCode] = useState("");
@@ -286,6 +298,14 @@ function CashCodeFlow({
       setSent(null);
     } catch (err) {
       onError(err instanceof Error ? err.message : "That code was not accepted. Please try again.");
+      // A spent, expired or missing code can never work again (ADR-0024), so go
+      // back to the first step and let him send a new one. A wrong code keeps
+      // the box, because he still has tries left.
+      if (err instanceof ApiError && CODE_GONE.has(err.code)) {
+        setCode("");
+        setSent(null);
+        onCodeGone();
+      }
     } finally {
       setBusy(false);
     }

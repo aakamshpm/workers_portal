@@ -471,6 +471,9 @@ model HandoverCode {
   expiresAt DateTime
   usedAt    DateTime?
 
+  /** Wrong codes typed for this one. Five spend it (ADR-0024). */
+  attempts Int @default(0)
+
   /** Set once the payment row exists, so the code and the payment are linked. */
   paymentId String?
 

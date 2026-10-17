@@ -51,6 +51,15 @@ paymentsRouter.use(requireAuth);
 /** How long a code stays usable. Minutes, because it is meant for the handover itself. */
 const CODE_TTL_MINUTES = 15;
 
+/** Wrong codes allowed before the code is spent (ADR-0024). */
+const MAX_WRONG_TRIES = 5;
+
+/** Thrown inside the payment transaction when another request used the code first. */
+class CodeAlreadyClaimed extends Error {}
+
+const SPENT_MESSAGE =
+  "Five wrong codes were typed, so this code no longer works. Send a new code to the worker.";
+
 const requestSchema = z.object({
   offerId: z.string().min(1, "Choose which work this payment is for"),
   amount: z.coerce.number().positive("How much are you handing over?"),
@@ -164,89 +173,136 @@ paymentsRouter.post("/confirm-code", requireRole("CONTRACTOR"), async (req, res)
     return res.status(403).json({ error: "That is not your contract" });
   }
 
-  const record = await prisma.handoverCode.findFirst({
-    where: { offerId, contractorId: req.user!.id, code, usedAt: null },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!record) {
-    return res.status(404).json({
-      error: "That code is wrong, or it has already been used. Ask the worker to read it again.",
-    });
-  }
-  if (record.expiresAt < new Date()) {
-    return res.status(409).json({
-      error: "That code has expired. Send a new one and try again.",
-    });
-  }
-
   const paidOn = new Date(parsed.data.paidOn);
   if (Number.isNaN(paidOn.getTime())) {
     return res.status(400).json({ error: "That date is not valid" });
   }
 
+  // Look up the live code of this contract first, and only then compare the
+  // digits. Searching for a row with the typed code, as before, finds nothing
+  // for a wrong code, so a wrong try could not be counted (ADR-0024).
+  const record = await prisma.handoverCode.findFirst({
+    where: { offerId, contractorId: req.user!.id, usedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!record) {
+    return res.status(404).json({
+      error: "No code is waiting for this payment. Send a new code to the worker.",
+      code: "NO_CODE",
+    });
+  }
+  if (record.expiresAt < new Date()) {
+    return res.status(409).json({
+      error: "That code has expired. Send a new one and try again.",
+      code: "CODE_EXPIRED",
+    });
+  }
+  if (record.attempts >= MAX_WRONG_TRIES) {
+    return res.status(409).json({ error: SPENT_MESSAGE, code: "CODE_SPENT" });
+  }
+
+  if (code !== record.code) {
+    // One atomic increment, so two wrong codes sent together both count.
+    const after = await prisma.handoverCode.update({
+      where: { id: record.id },
+      data: { attempts: { increment: 1 } },
+      select: { attempts: true },
+    });
+    const triesLeft = MAX_WRONG_TRIES - after.attempts;
+    if (triesLeft <= 0) {
+      return res.status(409).json({ error: SPENT_MESSAGE, code: "CODE_SPENT" });
+    }
+    return res.status(400).json({
+      error: `That code is wrong. ${triesLeft} ${triesLeft === 1 ? "try" : "tries"} left. Ask the worker to read it again.`,
+      code: "CODE_WRONG",
+      triesLeft,
+    });
+  }
+
   const confirmedAt = new Date();
   const amount = record.amount;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const payment = await tx.payment.create({
-      data: {
-        offerId,
-        amount,
-        paidOn,
-        method: "CASH",
-        note: note?.trim() || null,
-        proofType: "CODE",
-        proofAt: confirmedAt,
-        // The code IS the worker's confirmation, so the payment is confirmed
-        // the moment it is created.
-        confirmState: "CONFIRMED",
-        confirmedAt,
-        confirmedVia: "CODE",
-      },
-    });
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      // Claim the code before anything is written. The condition is checked by
+      // the database in the same statement, so if two requests with the right code
+      // arrive together, exactly one claims it. The other throws, and this
+      // transaction writes nothing.
+      const claimed = await tx.handoverCode.updateMany({
+        where: { id: record.id, usedAt: null, attempts: { lt: MAX_WRONG_TRIES } },
+        data: { usedAt: confirmedAt },
+      });
+      if (claimed.count !== 1) throw new CodeAlreadyClaimed();
 
-    await tx.handoverCode.update({
-      where: { id: record.id },
-      data: { usedAt: confirmedAt, paymentId: payment.id },
-    });
+      const payment = await tx.payment.create({
+        data: {
+          offerId,
+          amount,
+          paidOn,
+          method: "CASH",
+          note: note?.trim() || null,
+          proofType: "CODE",
+          proofAt: confirmedAt,
+          // The code IS the worker's confirmation, so the payment is confirmed
+          // the moment it is created.
+          confirmState: "CONFIRMED",
+          confirmedAt,
+          confirmedVia: "CODE",
+        },
+      });
 
-    const link = await appendToChain(tx, {
-      recordType: "PAYMENT",
-      recordId: payment.id,
-      workerId: offer.workerId,
-      summary: `Paid Rs ${amount.toFixed(2)} cash to ${offer.worker.name}, confirmed by handover code`,
-      payload: {
-        type: "PAYMENT",
-        offerId,
+      await tx.handoverCode.update({
+        where: { id: record.id },
+        data: { paymentId: payment.id },
+      });
+
+      const link = await appendToChain(tx, {
+        recordType: "PAYMENT",
+        recordId: payment.id,
         workerId: offer.workerId,
-        amount,
-        paidOn: paidOn.toISOString(),
-        method: "CASH",
-        note: note?.trim() ?? "",
-      },
-    });
+        summary: `Paid Rs ${amount.toFixed(2)} cash to ${offer.worker.name}, confirmed by handover code`,
+        payload: {
+          type: "PAYMENT",
+          offerId,
+          workerId: offer.workerId,
+          amount,
+          paidOn: paidOn.toISOString(),
+          method: "CASH",
+          note: note?.trim() ?? "",
+        },
+      });
 
-    // The worker's agreement, sealed as its own record exactly as an OK reply
-    // would be. The evidence is the same shape however it arrived.
-    const confirmLink = await appendToChain(tx, {
-      recordType: "CONFIRM",
-      recordId: `PAYMENT:${payment.id}`,
-      workerId: offer.workerId,
-      summary: `${offer.worker.name} confirmed receiving Rs ${amount.toFixed(0)} by reading out the handover code`,
-      payload: {
-        type: "CONFIRM",
-        targetType: "PAYMENT",
-        targetId: payment.id,
+      // The worker's agreement, sealed as its own record exactly as an OK reply
+      // would be. The evidence is the same shape however it arrived.
+      const confirmLink = await appendToChain(tx, {
+        recordType: "CONFIRM",
+        recordId: `PAYMENT:${payment.id}`,
         workerId: offer.workerId,
-        value: amount,
-        confirmedAt: confirmedAt.toISOString(),
-        via: "CODE",
-      },
-    });
+        summary: `${offer.worker.name} confirmed receiving Rs ${amount.toFixed(0)} by reading out the handover code`,
+        payload: {
+          type: "CONFIRM",
+          targetType: "PAYMENT",
+          targetId: payment.id,
+          workerId: offer.workerId,
+          value: amount,
+          confirmedAt: confirmedAt.toISOString(),
+          via: "CODE",
+        },
+      });
 
-    return { payment, link, confirmLink };
-  });
+      return { payment, link, confirmLink };
+    });
+  } catch (e) {
+    if (e instanceof CodeAlreadyClaimed) {
+      return res.status(404).json({
+        error: "That code has just been used. Check the list of payments before you try again.",
+        code: "NO_CODE",
+      });
+    }
+    throw e;
+  }
 
   const ref = shortRef(result.confirmLink.currentHash);
 
@@ -398,7 +454,12 @@ paymentsRouter.post("/reference", requireRole("CONTRACTOR"), async (req, res) =>
 // ---------------------------------------------------------------------------
 paymentsRouter.get("/pending-code", requireRole("CONTRACTOR"), async (req, res) => {
   const record = await prisma.handoverCode.findFirst({
-    where: { contractorId: req.user!.id, usedAt: null, expiresAt: { gt: new Date() } },
+    where: {
+      contractorId: req.user!.id,
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+      attempts: { lt: MAX_WRONG_TRIES },
+    },
     orderBy: { createdAt: "desc" },
     select: { offerId: true, amount: true, expiresAt: true, workerId: true },
   });

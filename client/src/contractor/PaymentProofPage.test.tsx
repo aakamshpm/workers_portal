@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ContractBalance, PaymentRow } from "./../shared/types";
 
 /**
@@ -13,16 +13,24 @@ import type { ContractBalance, PaymentRow } from "./../shared/types";
  *   that share the width on a normal phone and stack below 360px, so
  *   "Cash, with a code" is never squeezed onto three lines;
  * - in the list of payments, the two badges sit together under the text and
- *   start at the same left edge in every row, instead of one at each side.
+ *   start at the same left edge in every row, instead of one at each side;
+ * - a wrong code shows the server's message with the tries left, and keeps the
+ *   code box so he can type it again (ADR-0024);
+ * - a spent or expired code takes him back to the first step, so he can send
+ *   a new code instead of typing into a code that can no longer work.
  *
  * The API module is mocked. No test reaches the server.
  */
 
-vi.mock("../shared/api", () => ({
-  api: { balances: vi.fn(), paymentHistory: vi.fn(), pendingCode: vi.fn() },
-}));
+vi.mock("../shared/api", async () => {
+  const real = await vi.importActual<typeof import("../shared/api")>("../shared/api");
+  return {
+    ApiError: real.ApiError,
+    api: { balances: vi.fn(), paymentHistory: vi.fn(), pendingCode: vi.fn(), confirmCode: vi.fn() },
+  };
+});
 
-import { api } from "../shared/api";
+import { api, ApiError } from "../shared/api";
 import PaymentProofPage from "./PaymentProofPage";
 
 const BAL = {
@@ -87,5 +95,46 @@ describe("Pay a worker on a phone", () => {
     render(<PaymentProofPage />);
     const group = await screen.findByRole("group", { name: "How you paid" });
     expect(group.outerHTML).not.toMatch(/slate-|rose-|sky-|amber-/);
+  });
+
+  describe("typing the code the worker reads out", () => {
+    const PENDING = {
+      offerId: "o1", amount: 2000, expiresAt: "2026-10-17T10:15:00.000Z", workerId: "w",
+      worker: { name: "Bijoy Das", phone: "9880030001" },
+    };
+
+    async function typeCode(code: string) {
+      const box = await screen.findByRole("textbox", { name: "Enter the code the worker reads out" });
+      fireEvent.change(box, { target: { value: code } });
+      fireEvent.click(screen.getByRole("button", { name: "Verify code" }));
+      return box;
+    }
+
+    it("shows the tries left after a wrong code, and keeps the code box", async () => {
+      vi.mocked(api.pendingCode).mockResolvedValue(PENDING);
+      vi.mocked(api.confirmCode).mockRejectedValue(
+        new ApiError("That code is wrong. 3 tries left. Ask the worker to read it again.", "CODE_WRONG", 400, { triesLeft: 3 }),
+      );
+      render(<PaymentProofPage />);
+      await typeCode("1111");
+      expect(await screen.findByText(/3 tries left/)).toBeTruthy();
+      expect(screen.getByRole("textbox", { name: "Enter the code the worker reads out" })).toBeTruthy();
+    });
+
+    for (const code of ["CODE_SPENT", "CODE_EXPIRED", "NO_CODE"]) {
+      it(`goes back to sending a new code after ${code}`, async () => {
+        vi.mocked(api.pendingCode).mockResolvedValueOnce(PENDING).mockResolvedValue(null);
+        vi.mocked(api.confirmCode).mockRejectedValue(
+          new ApiError("This code no longer works. Send a new code to the worker.", code, 409),
+        );
+        render(<PaymentProofPage />);
+        await typeCode("1111");
+        expect(await screen.findByText(/no longer works/)).toBeTruthy();
+        await waitFor(() =>
+          expect(screen.queryByRole("textbox", { name: "Enter the code the worker reads out" })).toBeNull(),
+        );
+        expect(screen.getByRole("button", { name: "Send code to the worker's phone" })).toBeTruthy();
+      });
+    }
   });
 });
