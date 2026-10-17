@@ -27,6 +27,22 @@ export const CATEGORIES = [
 
 complaintsRouter.get("/categories", (_req, res) => res.json(CATEGORIES));
 
+/**
+ * The statuses that end a case (ADR-0023). Three come from a decision, and
+ * ESCALATED means the case went to another office. A closed complaint is never
+ * changed again, so every route that changes one checks this first.
+ */
+const CLOSED_STATUSES = ["RESOLVED", "REJECTED", "CLOSED_UNPROVEN", "ESCALATED"] as const;
+
+function isClosed(status: string): boolean {
+  return (CLOSED_STATUSES as readonly string[]).includes(status);
+}
+
+const CLOSED_ERROR = {
+  error: "This complaint is closed and cannot be changed.",
+  code: "COMPLAINT_CLOSED",
+} as const;
+
 const complaintSelect = {
   id: true,
   category: true,
@@ -162,7 +178,7 @@ complaintsRouter.get("/disputed-records", requireRole("AUTHORITY"), async (req, 
   // carries a decided complaint is very often the same matter under another name,
   // and saying so on screen is what stops the officer working it twice.
   const closedComplaints = await prisma.complaint.findMany({
-    where: { status: { in: ["RESOLVED", "REJECTED", "CLOSED_UNPROVEN", "ESCALATED"] } },
+    where: { status: { in: [...CLOSED_STATUSES] } },
     orderBy: { closedAt: "desc" },
     select: {
       offerId: true,
@@ -443,9 +459,7 @@ complaintsRouter.post("/:id/ask-employer", requireRole("AUTHORITY"), async (req,
   const id = String(req.params.id);
   const complaint = await prisma.complaint.findUnique({ where: { id }, select: { status: true } });
   if (!complaint) return res.status(404).json({ error: "That complaint does not exist" });
-  if (complaint.status === "RESOLVED" || complaint.status === "REJECTED") {
-    return res.status(409).json({ error: "That complaint is already closed" });
-  }
+  if (isClosed(complaint.status)) return res.status(409).json(CLOSED_ERROR);
 
   await prisma.complaintAction.create({
     data: { complaintId: id, authorId: req.user!.id, kind: "ASKED_EMPLOYER", note: parsed.data.note.trim() },
@@ -485,6 +499,9 @@ complaintsRouter.post("/:id/employer-reply", requireRole("CONTRACTOR"), async (r
   if (complaint.offer.contractorId !== req.user!.id) {
     return res.status(403).json({ error: "That complaint is not about your contract" });
   }
+  // A reply sets the status back to OPEN, so without this a contractor could
+  // reopen a case the office has already closed.
+  if (isClosed(complaint.status)) return res.status(409).json(CLOSED_ERROR);
 
   await prisma.complaintAction.create({
     data: {
@@ -538,6 +555,7 @@ complaintsRouter.post("/:id/contact", requireRole("AUTHORITY"), async (req, res)
     },
   });
   if (!complaint) return res.status(404).json({ error: "That complaint does not exist" });
+  if (isClosed(complaint.status)) return res.status(409).json(CLOSED_ERROR);
 
   await prisma.complaintAction.create({
     data: {
@@ -614,13 +632,7 @@ complaintsRouter.post("/:id/decide", requireRole("AUTHORITY"), async (req, res) 
     select: { status: true, raisedById: true, raisedBy: { select: { language: true } }, offerId: true },
   });
   if (!complaint) return res.status(404).json({ error: "That complaint does not exist" });
-  if (
-    complaint.status === "RESOLVED" ||
-    complaint.status === "REJECTED" ||
-    complaint.status === "CLOSED_UNPROVEN"
-  ) {
-    return res.status(409).json({ error: "That complaint is already closed" });
-  }
+  if (isClosed(complaint.status)) return res.status(409).json(CLOSED_ERROR);
 
   const { outcome, note } = parsed.data;
   // UNPROVEN closes the case as CLOSED_UNPROVEN rather than as resolved or
@@ -696,6 +708,7 @@ complaintsRouter.post("/:id/escalate", requireRole("AUTHORITY"), async (req, res
     select: { status: true, raisedById: true, raisedBy: { select: { language: true } }, offerId: true },
   });
   if (!complaint) return res.status(404).json({ error: "That complaint does not exist" });
+  if (isClosed(complaint.status)) return res.status(409).json(CLOSED_ERROR);
 
   const { to, note } = parsed.data;
 
@@ -711,7 +724,8 @@ complaintsRouter.post("/:id/escalate", requireRole("AUTHORITY"), async (req, res
 
   const updated = await prisma.complaint.update({
     where: { id },
-    data: { status: "ESCALATED" },
+    // Escalation ends the case here (ADR-0023), so it has a closing date like a decision.
+    data: { status: "ESCALATED", closedAt: new Date() },
     select: complaintSelect,
   });
 

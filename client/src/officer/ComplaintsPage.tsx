@@ -83,12 +83,10 @@ export default function ComplaintsPage({ user }: { user: AuthUser }) {
 
   if (loading) return <EmptyState>Please wait…</EmptyState>;
 
-  const open = complaints.filter(
-    (c) => c.status === "OPEN" || c.status === "AWAITING_EMPLOYER" || c.status === "ESCALATED",
-  );
-  const closed = complaints.filter(
-    (c) => c.status === "RESOLVED" || c.status === "REJECTED" || c.status === "CLOSED_UNPROVEN",
-  );
+  // An escalated case has left this office, so it is closed here (ADR-0023).
+  // The server refuses every action on it, so it must not show the buttons.
+  const open = complaints.filter((c) => c.status === "OPEN" || c.status === "AWAITING_EMPLOYER");
+  const closed = complaints.filter((c) => c.status !== "OPEN" && c.status !== "AWAITING_EMPLOYER");
 
   return (
     <div className="flex max-w-5xl flex-col gap-space-lg">

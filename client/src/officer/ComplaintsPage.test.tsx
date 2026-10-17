@@ -17,6 +17,8 @@ import type { AuthUser, Complaint, ContractBalance, DisputedRecord } from "../sh
  * - a decision needs a reason of ten characters, because the worker is sent it
  *   by SMS and an empty decision would reach his phone;
  * - closed cases stay on the page, found by the worker's name;
+ * - an escalated case is closed (ADR-0023): it is listed with the closed
+ *   cases, counted as closed, and has no action buttons;
  * - nothing uses a colour outside the theme.
  *
  * The API module is mocked. No test reaches the server, so no SMS is sent.
@@ -224,6 +226,21 @@ describe("Complaints page", () => {
     expect(closed.textContent).toContain("Sanjay Kumar");
     expect(closed.textContent).toContain("Days worked disputed");
     expect(closed.textContent).toContain("Paid in full on 20 Aug.");
+  });
+
+  it("lists an escalated case with the closed cases, with no action buttons", async () => {
+    const ESCALATED = {
+      ...OPEN, id: "k3", status: "ESCALATED", closedAt: "2026-08-20T00:00:00.000Z",
+      raisedBy: { id: "w3", name: "Rekha Munda", homeState: "Jharkhand", phone: "9880030004" },
+    } as unknown as Complaint;
+    vi.mocked(api.complaints).mockResolvedValue([OPEN, ESCALATED]);
+    await open();
+    expect(screen.queryByRole("article", { name: /Rekha Munda/ })).toBeNull();
+    const closed = screen.getByRole("region", { name: "Cases you have closed" });
+    expect(closed.textContent).toContain("Rekha Munda");
+    expect(within(closed).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("Open cases").parentElement!.textContent).toContain("1");
+    expect(screen.getByText("Closed").parentElement!.textContent).toContain("1");
   });
 
   it("says plainly when no complaint is waiting", async () => {
